@@ -8,6 +8,9 @@ pub fn Chat() -> Element {
     let mut current = use_signal(|| None::<usize>);
     let mut messages = use_signal(|| Vec::<String>::new());
     let mut input = use_signal(|| String::new());
+    let mut search = use_signal(|| String::new());
+    let mut model = use_signal(|| String::from("gpt-3.5"));
+    let mut dark = use_signal(|| false);
 
     // Load available conversations on mount
     use_effect(move || {
@@ -66,47 +69,96 @@ pub fn Chat() -> Element {
         }
     };
 
-    let sidebar = rsx! {
-        div { id: "sidebar",
-            button { onclick: move |_| { spawn(on_new_conv(())); }, "New" }
-            ul {
-                for cid in conversations().iter().cloned() {
-                    li {
-                        class: if Some(cid) == current() { "active" } else { "" },
-                        onclick: move |_| current.set(Some(cid)),
-                        "Conversation {cid}"
+    let show_sidebar = !(messages().is_empty() && conversations().len() <= 1);
+    let filtered: Vec<usize> = conversations()
+        .into_iter()
+        .filter(|cid| cid.to_string().contains(&search()))
+        .collect();
+
+    let sidebar = if show_sidebar {
+        rsx! {
+            div { id: "sidebar",
+                input {
+                    r#type: "text",
+                    placeholder: "Search...",
+                    value: "{search}",
+                    oninput: move |e| search.set(e.value()),
+                }
+                button {
+                    onclick: move |_| {
+                        spawn(on_new_conv(()));
+                    },
+                    "New"
+                }
+                ul { class: "conversations",
+                    for cid in filtered.iter().cloned() {
+                        li {
+                            class: if Some(cid) == current() { "active" } else { "" },
+                            onclick: move |_| current.set(Some(cid)),
+                            "Conversation {cid}"
+                        }
                     }
                 }
+                div { class: "account", "Logged in" }
             }
         }
+    } else {
+        rsx!(
+            div {}
+        )
     };
 
     rsx! {
         document::Link { rel: "stylesheet", href: CHAT_CSS }
-        div { id: "chat-container",
-            {sidebar}
-            div { id: "chat",
-                div { id: "messages",
-                    for msg in messages().iter() {
-                        p { "{msg}" }
+        div { id: "chat-container", class: if dark() { "dark" } else { "" },
+            div { id: "top-bar",
+                div { class: "model-select",
+                    select {
+                        value: "{model}",
+                        onchange: move |e| model.set(e.value()),
+                        option { value: "gpt-3.5", "GPT-3.5" }
+                        option { value: "gpt-4", "GPT-4" }
+                    }
+                }
+                div { class: "settings",
+                    button { "Settings" }
+                    label {
+                        "Dark"
+                        input {
+                            r#type: "checkbox",
+                            checked: dark(),
+                            onchange: move |_| dark.set(!dark()),
+                        }
                     }
                 }
             }
-            div { id: "input-area",
-                div { class: "input-container",
-                    input {
-                        value: "{input}",
-                        oninput: move |e| input.set(e.value()),
-                        onkeydown: move |e| {
-                            if e.key() == Key::Enter {
-                                spawn(on_send(()));
-                            }
-                        },
-                        placeholder: "Type a message...",
+            div { id: "main-area",
+                {sidebar}
+                div { id: "chat",
+                    div { id: "messages",
+                        for msg in messages().iter() {
+                            p { "{msg}" }
+                        }
                     }
-                    button {
-                        onclick: move |_| { spawn(on_send(())); },
-                        "Send"
+                }
+                div { id: "input-area",
+                    div { class: "input-container",
+                        input {
+                            value: "{input}",
+                            oninput: move |e| input.set(e.value()),
+                            onkeydown: move |e| {
+                                if e.key() == Key::Enter {
+                                    spawn(on_send(()));
+                                }
+                            },
+                            placeholder: "Type a message...",
+                        }
+                        button {
+                            onclick: move |_| {
+                                spawn(on_send(()));
+                            },
+                            "Send"
+                        }
                     }
                 }
             }

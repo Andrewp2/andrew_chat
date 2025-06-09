@@ -1,16 +1,35 @@
 #chat-container {
   display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#main-area {
+  display: flex;
+  flex: 1;
 }
 
 #sidebar {
   width: 200px;
   border-right: 1px solid #444;
   padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+#sidebar .conversations {
+  flex: 1;
+  overflow-y: auto;
 }
 
 #sidebar ul {
   list-style: none;
   padding: 0;
+}
+
+#sidebar input[type="text"] {
+  margin-bottom: 10px;
+  padding: 5px;
 }
 
 #sidebar li {
@@ -23,16 +42,16 @@
 }
 
 #chat {
-  max-width: 600px;
-  margin: 20px auto;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 #messages {
-  min-height: 300px;
+  flex: 1;
   border: 1px solid #444;
   padding: 10px;
-  margin-bottom: 10px;
+  overflow-y: auto;
 }
 
 #messages p {
@@ -40,10 +59,23 @@
   text-align: right;
 }
 
+button {
+  background-color: #444;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #666;
+}
+
 #input-area {
   display: flex;
-  flex-direction: column;
   gap: 10px;
+  margin-top: auto;
 }
 
 #input-area input {
@@ -51,6 +83,36 @@
   padding: 5px;
 }
 
-#input-area button {
-  padding: 5px 10px;
+
+#top-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #444;
+}
+
+#top-bar select {
+  padding: 5px;
+}
+
+#top-bar .settings {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#sidebar .account {
+  margin-top: auto;
+}
+
+#chat-container.dark {
+  background-color: #0f1116;
+  color: #ffffff;
+}
+
+#chat-container.light {
+  background-color: #ffffff;
+  color: #000000;
 }
