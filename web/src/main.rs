@@ -11,7 +11,6 @@ enum Route {
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
-const TAILWIND: &str = "https://cdn.tailwindcss.com";
 
 fn main() {
     dioxus::launch(App);
@@ -24,9 +23,11 @@ fn App() -> Element {
     rsx! {
         // Global app resources
         document::Link { rel: "icon", href: FAVICON }
-        script { src: TAILWIND }
+        document::Stylesheet {
+            // Urls are relative to your Cargo.toml file
+            href: asset!("/assets/tailwind.css"),
+        }
 
         Router::<Route> {}
     }
 }
-

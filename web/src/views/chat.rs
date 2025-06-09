@@ -101,9 +101,7 @@ pub fn Chat() -> Element {
             }
         }
     } else {
-        rsx!(
-            div {}
-        )
+        rsx!(div {})
     };
 
     rsx! {
@@ -160,7 +158,6 @@ pub fn Chat() -> Element {
                         }
                     }
                 }
-            
             }
         }
     }
