@@ -1,17 +1,15 @@
 use dioxus::prelude::*;
 
-const ECHO_CSS: Asset = asset!("/assets/styling/echo.css");
-
 /// Echo component that demonstrates fullstack server functions.
 #[component]
 pub fn Echo() -> Element {
     let mut response = use_signal(|| String::new());
 
     rsx! {
-        document::Link { rel: "stylesheet", href: ECHO_CSS }
-        div { id: "echo",
+        div { class: "w-90 mx-auto mt-12 bg-gray-800 p-5 rounded",
             h4 { "ServerFn Echo" }
             input {
+                class: "block w-full bg-transparent text-white border-b border-white focus:border-blue-300 outline-none",
                 placeholder: "Type here to echo...",
                 oninput: move |event| async move {
                     let data = api::echo(event.value()).await.unwrap();

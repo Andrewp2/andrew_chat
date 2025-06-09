@@ -1,6 +1,6 @@
 # Development
 
-Your new workspace contains a member crate for each of the web, desktop and mobile platforms, a `ui` crate for shared components and a `api` crate for shared backend logic:
+Your new workspace contains a member crate for each of the web, desktop and mobile platforms, a `ui` crate for shared components and a `api` crate for shared backend logic. Styling across the project is handled with [Tailwind CSS](https://tailwindcss.com) via CDN:
 
 ```
 your_project/
@@ -68,5 +68,20 @@ and serve:
 
 ```bash
 dx serve
+```
+
+
+### Building for release
+
+Use the Dioxus CLI to build a release for the target package. For example, to build the web app run:
+
+```bash
+dx build --package web
+```
+
+Similarly, you can build the desktop binary with:
+
+```bash
+dx build --package desktop
 ```
 

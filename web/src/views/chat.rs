@@ -1,7 +1,5 @@
 use dioxus::prelude::*;
 
-const CHAT_CSS: Asset = asset!("/assets/chat.css");
-
 #[component]
 pub fn Chat() -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
@@ -77,7 +75,7 @@ pub fn Chat() -> Element {
 
     let sidebar = if show_sidebar {
         rsx! {
-            div { id: "sidebar",
+            div { class: "w-48 border-r border-gray-700 p-2 flex flex-col",
                 input {
                     r#type: "text",
                     placeholder: "Search...",
@@ -90,10 +88,10 @@ pub fn Chat() -> Element {
                     },
                     "New"
                 }
-                ul { class: "conversations",
+                ul { class: "flex-1 overflow-y-auto list-none p-0",
                     for cid in filtered.iter().cloned() {
                         li {
-                            class: if Some(cid) == current() { "active" } else { "" },
+                            class: if Some(cid) == current() { "bg-gray-800 p-1" } else { "p-1" },
                             onclick: move |_| current.set(Some(cid)),
                             "Conversation {cid}"
                         }
@@ -103,14 +101,15 @@ pub fn Chat() -> Element {
             }
         }
     } else {
-        rsx!(div {})
+        rsx!(
+            div {}
+        )
     };
 
     rsx! {
-        document::Link { rel: "stylesheet", href: CHAT_CSS }
-        div { id: "chat-container", class: if dark() { "dark" } else { "" },
-            div { id: "top-bar",
-                div { class: "model-select",
+        div { class: if dark() { "dark bg-gray-900 text-white flex flex-col h-screen" } else { "bg-white text-black flex flex-col h-screen" },
+            div { class: "flex justify-between items-center p-2 border-b border-gray-700",
+                div {
                     select {
                         value: "{model}",
                         onchange: move |e| model.set(e.value()),
@@ -118,7 +117,7 @@ pub fn Chat() -> Element {
                         option { value: "gpt-4", "GPT-4" }
                     }
                 }
-                div { class: "settings",
+                div { class: "flex items-center gap-2",
                     button { "Settings" }
                     label {
                         "Dark"
@@ -130,36 +129,38 @@ pub fn Chat() -> Element {
                     }
                 }
             }
-            div { id: "main-area",
+            div { class: "flex flex-1",
                 {sidebar}
-                div { id: "chat",
-                    div { id: "messages",
+                div { class: "flex flex-col flex-1",
+                    div { class: "flex-1 border border-gray-700 p-2 overflow-y-auto",
                         for msg in messages().iter() {
                             p { "{msg}" }
                         }
                     }
-                    div { id: "input-area",
-                    div { class: "input-container",
-                        input {
-                            value: "{input}",
-                            oninput: move |e| input.set(e.value()),
-                            onkeydown: move |e| {
-                                if e.key() == Key::Enter {
+                    div { class: "flex gap-2 mt-auto",
+                        div { class: "flex gap-2 flex-1",
+                            input {
+                                class: "flex-1 p-1",
+                                value: "{input}",
+                                oninput: move |e| input.set(e.value()),
+                                onkeydown: move |e| {
+                                    if e.key() == Key::Enter {
+                                        spawn(on_send(()));
+                                    }
+                                },
+                                placeholder: "Type a message...",
+                            }
+                            button {
+                                class: "bg-gray-700 text-white rounded px-2",
+                                onclick: move |_| {
                                     spawn(on_send(()));
-                                }
-                            },
-                            placeholder: "Type a message...",
-                        }
-                        button {
-                            onclick: move |_| {
-                                spawn(on_send(()));
-                            },
-                            "Send"
+                                },
+                                "Send"
+                            }
                         }
                     }
                 }
-              }
-
+            
             }
         }
     }
