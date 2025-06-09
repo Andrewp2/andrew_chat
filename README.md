@@ -85,3 +85,9 @@ Similarly, you can build the desktop binary with:
 dx build --package desktop
 ```
 
+
+### Tailwind
+
+```bash
+npx @tailwindcss/cli -i ./input.css -o ./assets/tailwind.css --watch
+```
