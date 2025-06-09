@@ -40,9 +40,23 @@ pub fn Chat() -> Element {
                 }
             }
             div { id: "input-area",
-                input { 
+                input {
                     value: "{input}",
                     oninput: move |e| input.set(e.value()),
+                    onkeydown: move |e| async move {
+                        if e.key() == Key::Enter {
+                            let text = input().clone();
+                            let mut msgs = messages.clone();
+                            let mut input_signal = input.clone();
+                            if !text.is_empty() {
+                                api::send_message(text).await.ok();
+                                if let Ok(all) = api::get_messages().await {
+                                    msgs.set(all);
+                                }
+                                input_signal.set(String::new());
+                            }
+                        }
+                    },
                     placeholder: "Type a message...",
                 }
                 button { onclick: on_send, "Send" }
