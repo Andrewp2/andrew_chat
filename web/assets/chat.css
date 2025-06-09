@@ -1,6 +1,31 @@
+#chat-container {
+  display: flex;
+}
+
+#sidebar {
+  width: 200px;
+  border-right: 1px solid #444;
+  padding: 10px;
+}
+
+#sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+#sidebar li {
+  padding: 5px;
+  cursor: pointer;
+}
+
+#sidebar li.active {
+  background-color: #333;
+}
+
 #chat {
   max-width: 600px;
   margin: 20px auto;
+  flex: 1;
 }
 
 #messages {
