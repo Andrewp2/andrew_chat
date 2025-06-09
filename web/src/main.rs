@@ -1,13 +1,15 @@
 use dioxus::prelude::*;
 
 mod views;
-use views::Chat;
+use views::{Chat, Settings};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
     #[route("/")]
     Chat {},
+    #[route("/settings")]
+    Settings {},
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -23,6 +25,7 @@ fn App() -> Element {
     rsx! {
         // Global app resources
         document::Link { rel: "icon", href: FAVICON }
+        document::Stylesheet { href: "https://fonts.googleapis.com/css2?family=Proxima+Vara:wght@100..900&display=swap" }
         document::Stylesheet {
             // Urls are relative to your Cargo.toml file
             href: asset!("/assets/tailwind.css"),
