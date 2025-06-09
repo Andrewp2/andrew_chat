@@ -52,6 +52,8 @@ name = "api"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "once_cell",
+ "tokio",
 ]
 
 [[package]]
@@ -5229,8 +5231,8 @@ dependencies = [
 name = "web"
 version = "0.1.0"
 dependencies = [
+ "api",
  "dioxus",
- "ui",
 ]
 
 [[package]]

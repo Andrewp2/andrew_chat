@@ -1,0 +1,29 @@
+#chat {
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+#messages {
+  min-height: 300px;
+  border: 1px solid #444;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+#messages p {
+  margin: 5px 0;
+}
+
+#input-area {
+  display: flex;
+  gap: 10px;
+}
+
+#input-area input {
+  flex: 1;
+  padding: 5px;
+}
+
+#input-area button {
+  padding: 5px 10px;
+}

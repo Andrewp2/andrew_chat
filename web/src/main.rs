@@ -1,18 +1,13 @@
 use dioxus::prelude::*;
 
-use ui::Navbar;
-use views::{Blog, Home};
-
 mod views;
+use views::Chat;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
-    #[layout(WebNavbar)]
     #[route("/")]
-    Home {},
-    #[route("/blog/:id")]
-    Blog { id: i32 },
+    Chat {},
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -35,16 +30,3 @@ fn App() -> Element {
     }
 }
 
-/// A web-specific Router around the shared `Navbar` component
-/// which allows us to use the web-specific `Route` enum.
-#[component]
-fn WebNavbar() -> Element {
-    rsx! {
-        Navbar {
-            Link { to: Route::Home {}, "Home" }
-            Link { to: Route::Blog { id: 1 }, "Blog" }
-        }
-
-        Outlet::<Route> {}
-    }
-}
