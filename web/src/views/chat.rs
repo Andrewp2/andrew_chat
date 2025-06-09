@@ -68,7 +68,7 @@ pub fn Chat() -> Element {
 
     let sidebar = rsx! {
         div { id: "sidebar",
-            button { onclick: on_new_conv, "New" }
+            button { onclick: move |_| { spawn(on_new_conv(())); }, "New" }
             ul {
                 for cid in conversations().iter().cloned() {
                     li {
@@ -99,13 +99,13 @@ pub fn Chat() -> Element {
                         oninput: move |e| input.set(e.value()),
                         onkeydown: move |e| {
                             if e.key() == Key::Enter {
-                                on_send(());
+                                spawn(on_send(()));
                             }
                         },
                         placeholder: "Type a message...",
                     }
                     button {
-                        onclick: move |_| on_send(()),
+                        onclick: move |_| { spawn(on_send(())); },
                         "Send"
                     }
                 }
