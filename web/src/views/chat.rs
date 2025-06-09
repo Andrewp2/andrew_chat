@@ -103,9 +103,7 @@ pub fn Chat() -> Element {
             }
         }
     } else {
-        rsx!(
-            div {}
-        )
+        rsx!(div {})
     };
 
     rsx! {
@@ -140,8 +138,7 @@ pub fn Chat() -> Element {
                             p { "{msg}" }
                         }
                     }
-                }
-                div { id: "input-area",
+                    div { id: "input-area",
                     div { class: "input-container",
                         input {
                             value: "{input}",
@@ -161,6 +158,8 @@ pub fn Chat() -> Element {
                         }
                     }
                 }
+              }
+
             }
         }
     }

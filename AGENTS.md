@@ -19,3 +19,7 @@
 ## Format
 
 `dx fmt`
+
+## Instructions
+
+We don't have a mobile app yet so don't bother trying to build or check it.
