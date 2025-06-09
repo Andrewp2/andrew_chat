@@ -39,7 +39,7 @@ pub fn Chat() -> Element {
 
     let on_send = move |_| {
         let text = input().clone();
-        let mut msgs = messages.clone();
+        let mut msgs: Signal<Vec<String>> = messages.clone();
         let mut input_signal = input.clone();
         let conv = current().unwrap_or(0);
         async move {
@@ -93,24 +93,21 @@ pub fn Chat() -> Element {
                 }
             }
             div { id: "input-area",
-                input {
-                    value: "{input}",
-                    oninput: move |e| input.set(e.value()),
-                    onkeydown: move |e| async move {
-                        if e.key() == Key::Enter {
-                            let text = input().clone();
-                            let mut msgs = messages.clone();
-                            let mut input_signal = input.clone();
-                            if !text.is_empty() {
-                                api::send_message(text).await.ok();
-                                if let Ok(all) = api::get_messages().await {
-                                    msgs.set(all);
-                                }
-                                input_signal.set(String::new());
+                div { class: "input-container",
+                    input {
+                        value: "{input}",
+                        oninput: move |e| input.set(e.value()),
+                        onkeydown: move |e| {
+                            if e.key() == Key::Enter {
+                                on_send(());
                             }
-                        }
-                    },
-                    placeholder: "Type a message...",
+                        },
+                        placeholder: "Type a message...",
+                    }
+                    button {
+                        onclick: move |_| on_send(()),
+                        "Send"
+                    }
                 }
             }
         }
