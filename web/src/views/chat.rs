@@ -151,8 +151,17 @@ pub fn Chat() -> Element {
                 div { class: "flex flex-col flex-1 pl-4",
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
-                            for msg in messages().iter() {
-                                p { "{msg}" }
+                            for (idx , msg) in messages().iter().enumerate() {
+                                div { class: if idx % 2 == 0 { "flex justify-end" } else { "flex justify-center" },
+                                    p {
+                                        class: if idx % 2 == 0 { if is_dark() {
+                                            "bg-gray-700 text-white rounded px-2 py-1 mb-2 max-w-md"
+                                        } else {
+                                            "bg-gray-200 text-black rounded px-2 py-1 mb-2 max-w-md"
+                                        } } else { "mb-2 max-w-md" },
+                                        "{msg}"
+                                    }
+                                }
                             }
                         }
                     }
