@@ -98,3 +98,9 @@ The web chat interface includes optional speech-to-text and text-to-speech.
 Click the microphone button to dictate a message using your browser's speech
 recognition API. Incoming messages are read aloud via the Web Speech synthesis
 API.
+
+## Authentication
+
+The app now includes a very basic authentication flow. Navigate to `/login` to
+create an account and sign in. Credentials are stored in memory on the server
+for demonstration purposes only.
