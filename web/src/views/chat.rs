@@ -1,11 +1,12 @@
 use dioxus::prelude::*;
 use crate::Route;
+use api::ChatMessage;
 
 #[component]
 pub fn Chat() -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
     let mut current = use_signal(|| None::<usize>);
-    let mut messages = use_signal(|| Vec::<String>::new());
+    let mut messages = use_signal(|| Vec::<ChatMessage>::new());
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
@@ -61,12 +62,22 @@ pub fn Chat() -> Element {
 
     let on_send = move |_| {
         let text = input().clone();
-        let mut msgs: Signal<Vec<String>> = messages.clone();
+        let mut msgs: Signal<Vec<ChatMessage>> = messages.clone();
         let mut input_signal = input.clone();
         let conv = current().unwrap_or(0);
+        let selected_model = model().clone();
         async move {
             if !text.is_empty() {
-                api::send_message(conv, text).await.ok();
+                // store the user's text
+                api::send_message(conv, ChatMessage::Text(text.clone())).await.ok();
+
+                // if the selected model supports images, generate one
+                if selected_model == "dall-e" {
+                    if let Ok(img) = api::generate_image(text.clone()).await {
+                        api::send_message(conv, ChatMessage::Image(img)).await.ok();
+                    }
+                }
+
                 if let Ok(all) = api::get_messages(conv).await {
                     msgs.set(all);
                 }
@@ -130,7 +141,14 @@ pub fn Chat() -> Element {
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
                             for msg in messages().iter() {
-                                p { "{msg}" }
+                                match msg {
+                                    ChatMessage::Text(t) => rsx! {
+                                        p { "{t}" }
+                                    },
+                                    ChatMessage::Image(data) => rsx! {
+                                        img { src: "{data}" }
+                                    },
+                                }
                             }
                         }
                     }
@@ -159,6 +177,7 @@ pub fn Chat() -> Element {
                             onchange: move |e| model.set(e.value()),
                             option { value: "gpt-3.5", "GPT-3.5" }
                             option { value: "gpt-4", "GPT-4" }
+                            option { value: "dall-e", "DALL-E" }
                         }
                         Link {
                             to: Route::Settings {},
