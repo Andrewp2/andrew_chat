@@ -1,5 +1,26 @@
 use dioxus::prelude::*;
 use crate::Route;
+use pulldown_cmark::{html, Options, Parser};
+#[cfg(feature = "web")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "web")]
+#[wasm_bindgen(inline_js = "export function highlight_all() { if (window.hljs) { window.hljs.highlightAll(); } }")]
+extern "C" {
+    fn highlight_all();
+}
+
+fn markdown_to_html(text: &str) -> String {
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_FOOTNOTES);
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+    opts.insert(Options::ENABLE_TASKLISTS);
+    let parser = Parser::new_ext(text, opts);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    html_output
+}
 
 #[component]
 pub fn Chat() -> Element {
@@ -56,6 +77,13 @@ pub fn Chat() -> Element {
                 }
             }
         });
+        ()
+    });
+
+    #[cfg(feature = "web")]
+    use_effect(move || {
+        messages();
+        highlight_all();
         ()
     });
 
@@ -130,7 +158,7 @@ pub fn Chat() -> Element {
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
                             for msg in messages().iter() {
-                                p { "{msg}" }
+                                div { dangerous_inner_html: "{markdown_to_html(msg)}" }
                             }
                         }
                     }
