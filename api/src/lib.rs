@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
+use serde::{Deserialize, Serialize};
 
 /// Represents the messages for each conversation.
 type Conversations = Vec<Vec<String>>;
@@ -71,4 +72,73 @@ pub async fn register(username: String, password: String) -> Result<(), ServerFn
 pub async fn login(username: String, password: String) -> Result<bool, ServerFnError> {
     let users = USERS.read().await;
     Ok(users.get(&username).map(|p| p == &password).unwrap_or(false))
+
+#[derive(Serialize, Deserialize)]
+struct OpenAiMessage<'a> {
+    role: &'a str,
+    content: &'a str,
+}
+
+/// Query an AI model using the provided API key.
+///
+/// `provider` should be either `openai` or `anthropic`. The API key will be
+/// sent directly to the upstream provider for the request.
+#[server(ChatCompletion)]
+pub async fn chat_completion(
+    provider: String,
+    api_key: String,
+    prompt: String,
+    model: String,
+) -> Result<String, ServerFnError> {
+    match provider.as_str() {
+        "openai" => {
+            let client = reqwest::Client::new();
+            let body = serde_json::json!({
+                "model": model,
+                "messages": [OpenAiMessage { role: "user", content: &prompt }],
+            });
+            let res = client
+                .post("https://api.openai.com/v1/chat/completions")
+                .bearer_auth(api_key)
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+            let json: serde_json::Value = res
+                .json()
+                .await
+                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+            if let Some(reply) = json["choices"][0]["message"]["content"].as_str() {
+                Ok(reply.to_string())
+            } else {
+                Err(ServerFnError::ServerError("invalid response".into()))
+            }
+        }
+        "anthropic" => {
+            let client = reqwest::Client::new();
+            let body = serde_json::json!({
+                "model": model,
+                "max_tokens": 1024,
+                "messages": [{"role": "user", "content": prompt}],
+            });
+            let res = client
+                .post("https://api.anthropic.com/v1/messages")
+                .header("x-api-key", api_key)
+                .header("anthropic-version", "2023-06-01")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+            let json: serde_json::Value = res
+                .json()
+                .await
+                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+            if let Some(reply) = json["content"][0]["text"].as_str() {
+                Ok(reply.to_string())
+            } else {
+                Err(ServerFnError::ServerError("invalid response".into()))
+            }
+        }
+        _ => Err(ServerFnError::ServerError("unknown provider".into())),
+    }
 }
