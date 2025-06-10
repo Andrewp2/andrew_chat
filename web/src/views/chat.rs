@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::Route;
+use crate::speech::{speak, start_stt};
 use api::ChatMessage;
 use pulldown_cmark::{html, Options, Parser};
 #[cfg(feature = "web")]
@@ -105,6 +106,14 @@ fn ChatBase(id: Option<usize>) -> Element {
         ()
     });
 
+    let mut last_len = use_signal(|| 0usize);
+    use_effect(move || {
+        if messages().len() > last_len() {
+            if let Some(text) = messages().last() {
+                speak(text);
+            }
+            last_len.set(messages().len());
+        }
     #[cfg(feature = "web")]
     use_effect(move || {
         messages();
@@ -238,6 +247,16 @@ fn ChatBase(id: Option<usize>) -> Element {
                                 }
                             },
                             placeholder: "Type a message...",
+                        }
+                        button {
+                            class: "bg-gray-700 text-white rounded px-2",
+                            onclick: move |_| {
+                                start_stt({
+                                    let mut input = input.clone();
+                                    move |t| input.set(t)
+                                });
+                            },
+                            "🎤"
                         }
                         button {
                             class: "bg-gray-700 text-white rounded px-2",

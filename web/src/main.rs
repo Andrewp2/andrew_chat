@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
 mod views;
+mod speech;
 use views::{Chat, ChatShare, Settings, Login};
 
 #[derive(Debug, Clone, Routable, PartialEq)]

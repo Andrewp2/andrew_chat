@@ -92,6 +92,13 @@ dx build --package desktop
 npx @tailwindcss/cli -i ./input.css -o ./assets/tailwind.css --watch
 ```
 
+## Speech Features
+
+The web chat interface includes optional speech-to-text and text-to-speech.
+Click the microphone button to dictate a message using your browser's speech
+recognition API. Incoming messages are read aloud via the Web Speech synthesis
+API.
+
 ## Authentication
 
 The app now includes a very basic authentication flow. Navigate to `/login` to
