@@ -10,6 +10,7 @@ members = [
 
 [workspace.dependencies]
 dioxus = { version = "0.6.0" }
+katex-wasmbind = "0.10.0"
 
 # workspace
 ui = { path = "ui" }

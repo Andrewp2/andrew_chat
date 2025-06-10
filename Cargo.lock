@@ -2648,6 +2648,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "katex-wasmbind"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f9ba6f5ed17402f533b2d4dc8f01e5b06138085cfe521b5791a51656c673d4d"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5152,6 +5163,8 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "rustversion",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 
@@ -5233,6 +5246,7 @@ version = "0.1.0"
 dependencies = [
  "api",
  "dioxus",
+ "katex-wasmbind",
  "web-sys",
 ]
 

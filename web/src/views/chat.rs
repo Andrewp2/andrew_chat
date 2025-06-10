@@ -1,5 +1,18 @@
 use dioxus::prelude::*;
+use katex_wasmbind::KaTeXOptions;
 use crate::Route;
+
+fn render_message(msg: &str, opts: &KaTeXOptions) -> Element {
+    let html = if (msg.starts_with("$$") && msg.ends_with("$$")) || (msg.starts_with('$') && msg.ends_with('$')) {
+        let expr = if msg.starts_with("$$") { &msg[2..msg.len() - 2] } else { &msg[1..msg.len() - 1] };
+        opts.render(expr)
+    } else {
+        msg.to_string()
+    };
+    rsx!(
+        p { dangerous_inner_html: "{html}" }
+    )
+}
 
 #[component]
 pub fn Chat() -> Element {
@@ -10,6 +23,7 @@ pub fn Chat() -> Element {
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
     let mut theme = use_signal(|| String::from("system"));
+    let katex_opts = KaTeXOptions::inline_mode();
 
     let is_dark = move || {
         match theme().as_str() {
@@ -130,7 +144,7 @@ pub fn Chat() -> Element {
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
                             for msg in messages().iter() {
-                                p { "{msg}" }
+                                {render_message(msg, &katex_opts)}
                             }
                         }
                     }
