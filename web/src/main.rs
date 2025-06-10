@@ -1,13 +1,15 @@
 use dioxus::prelude::*;
 
 mod views;
-use views::{Chat, Settings, Login};
+use views::{Chat, ChatShare, Settings, Login};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
     #[route("/")]
     Chat {},
+    #[route("/chat/:id")]
+    ChatShare { id: usize },
     #[route("/settings")]
     Settings {},
     #[route("/login")]
