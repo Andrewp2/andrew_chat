@@ -1,6 +1,16 @@
 use dioxus::prelude::*;
 use crate::Route;
 
+#[cfg(feature = "web")]
+fn load_from_storage(key: &str) -> Option<String> {
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
+}
+
+#[cfg(not(feature = "web"))]
+fn load_from_storage(_key: &str) -> Option<String> { None }
+
 #[component]
 pub fn Chat() -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
@@ -9,7 +19,9 @@ pub fn Chat() -> Element {
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
-    let mut theme = use_signal(|| String::from("system"));
+    let theme = use_signal(|| String::from("system"));
+    let provider = use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
+    let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
 
     let is_dark = move || {
         match theme().as_str() {
@@ -64,11 +76,21 @@ pub fn Chat() -> Element {
         let mut msgs: Signal<Vec<String>> = messages.clone();
         let mut input_signal = input.clone();
         let conv = current().unwrap_or(0);
+        let model_sel = model();
+        let provider_sel = provider();
+        let key_sel = api_key();
         async move {
             if !text.is_empty() {
-                api::send_message(conv, text).await.ok();
+                let user_msg = text.clone();
+                api::send_message(conv, user_msg.clone()).await.ok();
                 if let Ok(all) = api::get_messages(conv).await {
                     msgs.set(all);
+                }
+                if let Ok(resp) = api::chat_completion(provider_sel, key_sel, user_msg, model_sel).await {
+                    api::send_message(conv, resp).await.ok();
+                    if let Ok(all) = api::get_messages(conv).await {
+                        msgs.set(all);
+                    }
                 }
                 input_signal.set(String::new());
             }
