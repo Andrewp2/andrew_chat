@@ -2,14 +2,31 @@
 use dioxus::prelude::*;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{broadcast, RwLock};
+use tokio_stream::wrappers::BroadcastStream;
+use futures::{stream, StreamExt};
+use server_fn::codec::{StreamingText, TextStream};
 
 /// Represents the messages for each conversation.
-type Conversations = Vec<Vec<String>>;
+struct Conversation {
+    messages: Vec<String>,
+    tx: broadcast::Sender<String>,
+}
 
-/// In memory list of chat messages.
-/// In memory list of conversations. Each conversation is a vector of chat messages.
-static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> = Lazy::new(|| Arc::new(RwLock::new(vec![Vec::new()])));
+impl Conversation {
+    fn new() -> Self {
+        let (tx, _rx) = broadcast::channel(32);
+        Self { messages: Vec::new(), tx }
+    }
+}
+
+type Conversations = Vec<Conversation>;
+
+/// In memory list of conversations used for demo purposes.
+/// Each conversation stores messages and broadcasts new ones for streaming.
+static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> = Lazy::new(|| {
+    Arc::new(RwLock::new(vec![Conversation::new()]))
+});
 
 /// Echo the user input on the server.
 #[server(Echo)]
@@ -22,7 +39,7 @@ pub async fn echo(input: String) -> Result<String, ServerFnError> {
 pub async fn create_conversation() -> Result<usize, ServerFnError> {
     let mut history = CHAT_HISTORY.write().await;
     let id = history.len();
-    history.push(Vec::new());
+    history.push(Conversation::new());
     Ok(id)
 }
 
@@ -38,7 +55,8 @@ pub async fn list_conversations() -> Result<Vec<usize>, ServerFnError> {
 pub async fn send_message(conv_id: usize, msg: String) -> Result<(), ServerFnError> {
     let mut history = CHAT_HISTORY.write().await;
     if let Some(conv) = history.get_mut(conv_id) {
-        conv.push(msg);
+        conv.messages.push(msg.clone());
+        let _ = conv.tx.send(msg);
     }
     Ok(())
 }
@@ -47,5 +65,30 @@ pub async fn send_message(conv_id: usize, msg: String) -> Result<(), ServerFnErr
 #[server(GetMessages)]
 pub async fn get_messages(conv_id: usize) -> Result<Vec<String>, ServerFnError> {
     let history = CHAT_HISTORY.read().await;
-    Ok(history.get(conv_id).cloned().unwrap_or_default())
+    Ok(history
+        .get(conv_id)
+        .map(|c| c.messages.clone())
+        .unwrap_or_default())
+}
+
+/// Stream messages for a conversation starting at the given index.
+#[server(StreamMessages, output = StreamingText)]
+pub async fn stream_messages(
+    conv_id: usize,
+    from: usize,
+) -> Result<TextStream, ServerFnError> {
+    let (messages, sender) = {
+        let history = CHAT_HISTORY.read().await;
+        if let Some(conv) = history.get(conv_id) {
+            (conv.messages.clone(), conv.tx.clone())
+        } else {
+            return Ok(TextStream::new(stream::empty()));
+        }
+    };
+
+    let past = messages.into_iter().skip(from).map(Ok);
+    let rx = sender.subscribe();
+    let incoming = BroadcastStream::new(rx).filter_map(|msg| async move { msg.ok().map(Ok) });
+    let stream = stream::iter(past).chain(incoming);
+    Ok(TextStream::new(stream))
 }

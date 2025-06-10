@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use futures_util::StreamExt;
 use crate::Route;
 
 #[component]
@@ -59,17 +60,30 @@ pub fn Chat() -> Element {
         ()
     });
 
+    // Stream new messages for the current conversation
+    use_effect(move || {
+        let id = current();
+        let mut msgs = messages.clone();
+        spawn(async move {
+            if let Some(cid) = id {
+                if let Ok(stream) = api::stream_messages(cid, msgs().len()).await {
+                    let mut inner = stream.into_inner();
+                    while let Some(Ok(chunk)) = inner.next().await {
+                        msgs.with_mut(|m| m.push(chunk));
+                    }
+                }
+            }
+        });
+        ()
+    });
+
     let on_send = move |_| {
         let text = input().clone();
-        let mut msgs: Signal<Vec<String>> = messages.clone();
         let mut input_signal = input.clone();
         let conv = current().unwrap_or(0);
         async move {
             if !text.is_empty() {
                 api::send_message(conv, text).await.ok();
-                if let Ok(all) = api::get_messages(conv).await {
-                    msgs.set(all);
-                }
                 input_signal.set(String::new());
             }
         }

@@ -52,8 +52,10 @@ name = "api"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "futures",
  "once_cell",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -5233,6 +5235,7 @@ version = "0.1.0"
 dependencies = [
  "api",
  "dioxus",
+ "futures-util",
  "web-sys",
 ]
 
