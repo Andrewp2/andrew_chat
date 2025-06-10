@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 dioxus = { workspace = true, features = ["router"] }
 api = { workspace = true }
+<<<<<<< HEAD
 katex-wasmbind = { workspace = true }
 futures-util = "0.3"
 gloo-file = { version = "0.3", features = ["futures"] }
@@ -24,8 +25,16 @@ web-sys = { version = "0.3", features = [
 ] }
 pulldown-cmark = "0.9"
 wasm-bindgen = "0.2"
+=======
+web-sys = { version = "0.3", features = [
+  "Window",
+  "MediaQueryList",
+  "DomTokenList",
+  "Element",
+] }
+>>>>>>> 00c8f4b (WIP)
 
 [features]
-default = []
+default = ["web"]
 web = ["dioxus/web"]
 server = ["dioxus/server"]

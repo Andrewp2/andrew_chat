@@ -11,11 +11,7 @@ enum Route {
     #[layout(MobileNavbar)]
     #[route("/")]
     Home {},
-    #[route("/blog/:id")]
-    Blog { id: i32 },
 }
-
-const TAILWIND: &str = "https://cdn.tailwindcss.com";
 
 fn main() {
     dioxus::launch(App);
@@ -26,8 +22,6 @@ fn App() -> Element {
     // Build cool things ✌️
 
     rsx! {
-        // Global app resources
-        script { src: TAILWIND }
 
         Router::<Route> {}
     }
@@ -40,7 +34,6 @@ fn MobileNavbar() -> Element {
     rsx! {
         Navbar {
             Link { to: Route::Home {}, "Home" }
-            Link { to: Route::Blog { id: 1 }, "Blog" }
         }
 
         Outlet::<Route> {}

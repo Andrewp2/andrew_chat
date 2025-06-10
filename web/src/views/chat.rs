@@ -1,4 +1,6 @@
+use crate::{views::Theme, Route};
 use dioxus::prelude::*;
+<<<<<<< HEAD
 use katex_wasmbind::KaTeXOptions;
 use futures_util::StreamExt;
 use crate::Route;
@@ -54,6 +56,8 @@ fn render_message(msg: &str, opts: &KaTeXOptions) -> Element {
         p { dangerous_inner_html: "{html}" }
     )
 }
+=======
+>>>>>>> 00c8f4b (WIP)
 
 #[component]
 fn ChatBase(id: Option<usize>) -> Element {
@@ -64,34 +68,27 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
+<<<<<<< HEAD
     let mut theme = use_signal(|| String::from("system"));
     let mut use_web_search = use_signal(|| false);
     let katex_opts = KaTeXOptions::inline_mode();
     let provider = use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
     let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
+=======
+    let _theme = use_context::<Signal<Theme>>();
+>>>>>>> 00c8f4b (WIP)
 
-    let is_dark = move || {
-        match theme().as_str() {
-            "dark" => true,
-            "system" => {
-                #[cfg(feature = "web")]
-                {
-                    web_sys::window()
-                        .and_then(|w| w.match_media("(prefers-color-scheme: dark)").ok().flatten())
-                        .map(|m| m.matches())
-                        .unwrap_or(false)
-                }
-                #[cfg(not(feature = "web"))]
-                {
-                    false
-                }
+    let conv_res = use_resource(|| async move {
+        let mut list = api::list_conversations().await.unwrap_or_default();
+        if list.is_empty() {
+            if let Ok(id) = api::create_conversation().await {
+                list.push(id);
             }
-            _ => false,
         }
-    };
-
-    // Load available conversations on mount
+        list
+    });
     use_effect(move || {
+<<<<<<< HEAD
         let init = id;
         spawn(async move {
             let mut list = api::list_conversations().await.unwrap_or_default();
@@ -115,19 +112,27 @@ fn ChatBase(id: Option<usize>) -> Element {
             conversations.set(list);
         });
         ()
+=======
+        if let Some(list) = &*conv_res.read_unchecked() {
+            if current.peek().is_none() {
+                current.set(list.first().cloned());
+                conversations.set(list.clone());
+            }
+        }
+>>>>>>> 00c8f4b (WIP)
     });
 
-    // Load messages whenever the current conversation changes
+    let msg_res = use_resource(move || async move {
+        if let Some(cid) = current() {
+            api::get_messages(cid).await.unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    });
     use_effect(move || {
-        let id = current();
-        spawn(async move {
-            if let Some(cid) = id {
-                if let Ok(msgs) = api::get_messages(cid).await {
-                    messages.set(msgs);
-                }
-            }
-        });
-        ()
+        if let Some(list) = &*msg_res.read_unchecked() {
+            messages.set(list.clone());
+        }
     });
 
     // Stream new messages for the current conversation
@@ -234,7 +239,11 @@ fn ChatBase(id: Option<usize>) -> Element {
 
     let filtered: Vec<usize> = conversations()
         .into_iter()
-        .filter(|cid| cid.to_string().to_lowercase().contains(&search().to_lowercase()))
+        .filter(|cid| {
+            cid.to_string()
+                .to_lowercase()
+                .contains(&search().to_lowercase())
+        })
         .collect();
 
     let sidebar = rsx! {
@@ -267,10 +276,19 @@ fn ChatBase(id: Option<usize>) -> Element {
     };
 
     rsx! {
-        div { class: if is_dark() { "dark bg-gray-900 text-white flex flex-col h-screen font-sans p-4" } else { "bg-white text-black flex flex-col h-screen font-sans p-4" },
+      SuspenseBoundary {
+        fallback: |_| rsx! { "Loading conversations..." },
+        div { class: "dark:bg-gray-900 dark:text-white bg-white text-black flex flex-col h-screen font-sans p-4",
             div { class: "flex flex-1 overflow-hidden",
                 {sidebar}
                 div { class: "flex flex-col flex-1 pl-4",
+                select {
+                  class: "border border-gray-700 rounded p-1",
+                  value: "{model}",
+                  onchange: move |e| model.set(e.value()),
+                  option { value: "gpt-3.5", "GPT-3.5" }
+                  option { value: "gpt-4", "GPT-4" }
+              }
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
                             for msg in messages().iter() {
@@ -370,6 +388,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                             },
                             "Send"
                         }
+<<<<<<< HEAD
                         select {
                             class: "border border-gray-700 rounded p-1",
                             value: "{model}",
@@ -412,6 +431,8 @@ fn ChatBase(id: Option<usize>) -> Element {
                             class: "underline text-sm",
                             "Share"
                         }
+=======
+>>>>>>> 00c8f4b (WIP)
                         Link {
                             to: Route::Settings {},
                             class: "underline text-sm",
@@ -421,6 +442,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                 }
             }
         }
+      }
     }
 }
 

@@ -23,3 +23,5 @@
 ## Instructions
 
 We don't have a mobile app yet so don't bother trying to build or check it.
+
+cx: Scope no longer exists in Dioxus 0.6. Please do not add it or use it.

@@ -1,8 +1,15 @@
 use dioxus::prelude::*;
+use web_sys::window;
 
 mod views;
+<<<<<<< HEAD
 mod speech;
 use views::{Chat, ChatShare, Settings, Login};
+=======
+use views::{Chat, NotFound, Settings};
+
+use crate::views::Theme;
+>>>>>>> 00c8f4b (WIP)
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -13,8 +20,13 @@ enum Route {
     ChatShare { id: usize },
     #[route("/settings")]
     Settings {},
+<<<<<<< HEAD
     #[route("/login")]
     Login {},
+=======
+    #[route("/:..route")]
+    NotFound { route: Vec<String> },
+>>>>>>> 00c8f4b (WIP)
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -25,14 +37,55 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    // Build cool things ✌️
+    let theme = use_signal(|| {
+        #[cfg(target_arch = "wasm32")]
+        {
+            window()
+                .and_then(|w| w.local_storage().ok().flatten())
+                .and_then(|ls| ls.get_item("theme").ok().flatten())
+                .map(|t| match t.as_str() {
+                    "dark" => Theme::Dark,
+                    "light" => Theme::Light,
+                    _ => Theme::System,
+                })
+                .unwrap_or(Theme::System)
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Theme::System
+        }
+    });
+
+    use_effect(move || {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Some(win) = window() {
+                if let Some(ls) = win.local_storage().ok().flatten() {
+                    let s = match theme() {
+                        Theme::Dark => "dark",
+                        Theme::Light => "light",
+                        Theme::System => "system",
+                    };
+                    let _ = ls.set_item("theme", s);
+                    if let Some(doc) = win.document() {
+                        let html = doc.document_element().unwrap();
+                        if matches!(theme(), Theme::Dark) {
+                            let _ = html.class_list().add_1("dark");
+                        } else {
+                            let _ = html.class_list().remove_1("dark");
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    use_context_provider(|| theme);
 
     rsx! {
-        // Global app resources
         document::Link { rel: "icon", href: FAVICON }
         document::Stylesheet { href: "https://fonts.googleapis.com/css2?family=Proxima+Vara:wght@100..900&display=swap" }
         document::Stylesheet {
-            // Urls are relative to your Cargo.toml file
             href: asset!("/assets/tailwind.css"),
         }
         document::Stylesheet { href: "https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" }

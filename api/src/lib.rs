@@ -63,6 +63,7 @@ type Conversations = Vec<Vec<ChatMessage>>;
 /// In memory list of conversations. Each conversation is a vector of chat messages.
 static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![Vec::new()])));
+<<<<<<< HEAD
 
 /// In-memory store of users where the key is the username and the value is the password.
 static USERS: Lazy<Arc<RwLock<HashMap<String, String>>>> =
@@ -73,6 +74,8 @@ static USERS: Lazy<Arc<RwLock<HashMap<String, String>>>> =
 pub async fn echo(input: String) -> Result<String, ServerFnError> {
     Ok(input)
 }
+=======
+>>>>>>> 00c8f4b (WIP)
 
 /// Create a new conversation and return its id.
 #[server(CreateConversation)]
