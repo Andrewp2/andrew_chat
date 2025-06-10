@@ -180,7 +180,24 @@ pub fn Chat() -> Element {
                             value: "{model}",
                             onchange: move |e| model.set(e.value()),
                             option { value: "gpt-3.5", "GPT-3.5" }
-                            option { value: "gpt-4", "GPT-4" }
+                            option { value: "gpt-o3", "GPT-0.3" }
+                            option { value: "gpt-4o", "GPT-4o" }
+                            option { value: "gpt-4o-mini", "GPT-4o Mini" }
+                            option { value: "gpt-04-mini", "GPT-04 Mini" }
+                            option { value: "gpt-4.1", "GPT-4.1" }
+                            option { value: "gpt-4.1-mini", "GPT-4.1 Mini" }
+                            option { value: "gpt-4.1-nano", "GPT-4.1 Nano" }
+                            option { value: "gpt-4.5", "GPT-4.5" }
+                            option { value: "gemini-2.5-flash", "Gemini 2.5 Flash" }
+                            option { value: "gemini-2.5-pro", "Gemini 2.5 Pro" }
+                            option { value: "claude-4-sonnet", "Claude 4 Sonnet" }
+                            option { value: "claude-4-sonnet-reasoning", "Claude 4 Sonnet Reasoning" }
+                            option { value: "deepseek-r1", "Deepseek r1" }
+                            option { value: "deepseek-v3", "Deepseek v3" }
+                            option { value: "llama-4-scout", "Llama 4 Scout" }
+                            option { value: "qwen-2.5-32b", "Qwen 2.5 32B" }
+                            option { value: "grok-3", "Grok 3" }
+                            option { value: "grok-3-mini", "Grok 3 Mini" }
                         }
                         Link {
                             to: Route::Settings {},
