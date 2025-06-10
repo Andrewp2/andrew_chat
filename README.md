@@ -91,3 +91,9 @@ dx build --package desktop
 ```bash
 npx @tailwindcss/cli -i ./input.css -o ./assets/tailwind.css --watch
 ```
+
+## Authentication
+
+The app now includes a very basic authentication flow. Navigate to `/login` to
+create an account and sign in. Credentials are stored in memory on the server
+for demonstration purposes only.
