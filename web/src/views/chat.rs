@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::Route;
+use api::ChatMessage;
 use pulldown_cmark::{html, Options, Parser};
 #[cfg(feature = "web")]
 use wasm_bindgen::prelude::*;
@@ -36,7 +37,7 @@ fn load_from_storage(_key: &str) -> Option<String> { None }
 fn ChatBase(id: Option<usize>) -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
     let mut current = use_signal(|| None::<usize>);
-    let mut messages = use_signal(|| Vec::<String>::new());
+    let mut messages = use_signal(|| Vec::<ChatMessage>::new());
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
@@ -113,9 +114,22 @@ fn ChatBase(id: Option<usize>) -> Element {
 
     let on_send = move |_| {
         let text = input().clone();
-        let mut msgs: Signal<Vec<String>> = messages.clone();
+        let mut msgs: Signal<Vec<ChatMessage>> = messages.clone();
         let mut input_signal = input.clone();
         let conv = current().unwrap_or(0);
+        let selected_model = model().clone();
+        async move {
+            if !text.is_empty() {
+                // store the user's text
+                api::send_message(conv, ChatMessage::Text(text.clone())).await.ok();
+
+                // if the selected model supports images, generate one
+                if selected_model == "dall-e" {
+                    if let Ok(img) = api::generate_image(text.clone()).await {
+                        api::send_message(conv, ChatMessage::Image(img)).await.ok();
+                    }
+                }
+
         let model_sel = model();
         let provider_sel = provider();
         let key_sel = api_key();
@@ -191,6 +205,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                 div { class: "flex flex-col flex-1 pl-4",
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
+
                             for (idx , msg) in messages().iter().enumerate() {
                                 div { class: if idx % 2 == 0 { "flex justify-end" } else { "flex justify-center" },
                                     p {
@@ -199,7 +214,14 @@ fn ChatBase(id: Option<usize>) -> Element {
                                         } else {
                                             "bg-gray-200 text-black rounded px-2 py-1 mb-2 max-w-md"
                                         } } else { "mb-2 max-w-md" },
-                                        dangerous_inner_html: "{markdown_to_html(msg)}"
+                                        match msg {
+                                    ChatMessage::Text(t) => rsx! {
+                                        p { dangerous_inner_html: "{markdown_to_html(msg)}" }
+                                    },
+                                    ChatMessage::Image(data) => rsx! {
+                                        img { src: "{data}" }
+                                    },
+                                        
                                     }
                                 }
                             }
@@ -229,6 +251,8 @@ fn ChatBase(id: Option<usize>) -> Element {
                             value: "{model}",
                             onchange: move |e| model.set(e.value()),
                             option { value: "gpt-3.5", "GPT-3.5" }
+                            option { value: "gpt-4", "GPT-4" }
+                            option { value: "dall-e", "DALL-E" }
                             option { value: "gpt-o3", "GPT-0.3" }
                             option { value: "gpt-4o", "GPT-4o" }
                             option { value: "gpt-4o-mini", "GPT-4o Mini" }

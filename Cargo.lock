@@ -51,11 +51,9 @@ dependencies = [
 name = "api"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "dioxus",
  "once_cell",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
  "tokio",
 ]
 
