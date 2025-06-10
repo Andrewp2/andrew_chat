@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 use crate::Route;
 
 #[component]
-pub fn Chat() -> Element {
+fn ChatBase(id: Option<usize>) -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
     let mut current = use_signal(|| None::<usize>);
     let mut messages = use_signal(|| Vec::<String>::new());
@@ -33,6 +33,7 @@ pub fn Chat() -> Element {
 
     // Load available conversations on mount
     use_effect(move || {
+        let init = id;
         spawn(async move {
             let mut list = api::list_conversations().await.unwrap_or_default();
             if list.is_empty() {
@@ -40,7 +41,18 @@ pub fn Chat() -> Element {
                     list.push(id);
                 }
             }
-            current.set(list.first().cloned());
+            if let Some(cid) = init {
+                while list.len() <= cid {
+                    if let Ok(new_id) = api::create_conversation().await {
+                        list.push(new_id);
+                    } else {
+                        break;
+                    }
+                }
+                current.set(Some(cid));
+            } else {
+                current.set(list.first().cloned());
+            }
             conversations.set(list);
         });
         ()
@@ -161,6 +173,13 @@ pub fn Chat() -> Element {
                             option { value: "gpt-4", "GPT-4" }
                         }
                         Link {
+                            to: Route::ChatShare {
+                                id: current().unwrap_or(0),
+                            },
+                            class: "underline text-sm",
+                            "Share"
+                        }
+                        Link {
                             to: Route::Settings {},
                             class: "underline text-sm",
                             "Settings"
@@ -170,4 +189,18 @@ pub fn Chat() -> Element {
             }
         }
     }
+}
+
+#[component]
+pub fn Chat() -> Element {
+    rsx!(
+        ChatBase { id: None }
+    )
+}
+
+#[component]
+pub fn ChatShare(id: usize) -> Element {
+    rsx!(
+        ChatBase { id: Some(id) }
+    )
 }
