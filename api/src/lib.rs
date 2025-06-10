@@ -1,5 +1,6 @@
 //! This crate contains all shared fullstack server functions.
 use dioxus::prelude::*;
+use serde::{Deserialize, Serialize};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -16,12 +17,27 @@ pub enum ChatMessage {
 }
 use serde::{Deserialize, Serialize};
 
+/// Attachment data sent with a chat message.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Attachment {
+    pub filename: String,
+    pub content_type: String,
+    pub data: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub text: Option<String>,
+    pub attachment: Option<Attachment>,
+}
+
 /// Represents the messages for each conversation.
 type Conversations = Vec<Vec<ChatMessage>>;
 
 /// In memory list of chat messages.
 /// In memory list of conversations. Each conversation is a vector of chat messages.
-static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> = Lazy::new(|| Arc::new(RwLock::new(vec![Vec::new()])));
+static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> =
+    Lazy::new(|| Arc::new(RwLock::new(vec![Vec::new()])));
 
 /// In-memory store of users where the key is the username and the value is the password.
 static USERS: Lazy<Arc<RwLock<HashMap<String, String>>>> =

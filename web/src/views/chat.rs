@@ -1,5 +1,12 @@
 use dioxus::prelude::*;
 use crate::Route;
+use api::{Attachment, ChatMessage};
+#[cfg(feature = "web")]
+use base64::engine::general_purpose::STANDARD as BASE64;
+#[cfg(feature = "web")]
+use base64::Engine;
+#[cfg(feature = "web")]
+use gloo_file::{futures::read_as_bytes, File};
 use crate::speech::{speak, start_stt};
 use api::ChatMessage;
 use pulldown_cmark::{html, Options, Parser};
@@ -39,6 +46,7 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
     let mut current = use_signal(|| None::<usize>);
     let mut messages = use_signal(|| Vec::<ChatMessage>::new());
+    let attachment = use_signal(|| None::<Attachment>);
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
@@ -123,8 +131,10 @@ fn ChatBase(id: Option<usize>) -> Element {
 
     let on_send = move |_| {
         let text = input().clone();
+        let attach = attachment();
         let mut msgs: Signal<Vec<ChatMessage>> = messages.clone();
         let mut input_signal = input.clone();
+        let mut attachment_signal = attachment.clone();
         let conv = current().unwrap_or(0);
         let selected_model = model().clone();
         async move {
@@ -143,6 +153,13 @@ fn ChatBase(id: Option<usize>) -> Element {
         let provider_sel = provider();
         let key_sel = api_key();
         async move {
+            if !text.is_empty() || attach.is_some() {
+                api::send_message(
+                    conv,
+                    ChatMessage { text: if text.is_empty() { None } else { Some(text) }, attachment: attach },
+                )
+                .await
+                .ok();
             if !text.is_empty() {
                 let user_msg = text.clone();
                 api::send_message(conv, user_msg.clone()).await.ok();
@@ -156,6 +173,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                     }
                 }
                 input_signal.set(String::new());
+                attachment_signal.set(None);
             }
         }
     };
@@ -214,6 +232,22 @@ fn ChatBase(id: Option<usize>) -> Element {
                 div { class: "flex flex-col flex-1 pl-4",
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
+                            for msg in messages().iter() {
+                                if let Some(text) = &msg.text {
+                                    p { "{text}" }
+                                }
+                                if let Some(att) = &msg.attachment {
+                                    if att.content_type.starts_with("image/") {
+                                        img {
+                                            src: "data:{att.content_type};base64,{att.data}",
+                                            class: "max-w-xs",
+                                        }
+                                    } else if att.content_type == "application/pdf" {
+                                        a {
+                                            href: "data:{att.content_type};base64,{att.data}",
+                                            target: "_blank",
+                                            "View PDF"
+                                        }
 
                             for (idx , msg) in messages().iter().enumerate() {
                                 div { class: if idx % 2 == 0 { "flex justify-end" } else { "flex justify-center" },
@@ -247,6 +281,34 @@ fn ChatBase(id: Option<usize>) -> Element {
                                 }
                             },
                             placeholder: "Type a message...",
+                        }
+                        input {
+                            r#type: "file",
+                            accept: "image/*,application/pdf",
+                            onchange: move |_e| {
+                                #[cfg(feature = "web")]
+                                if let Some(list) = _e.files() {
+                                    if let Some(file) = list.first() {
+                                        let gfile: File = file.clone().into();
+                                        let name = gfile.name().to_string();
+                                        let mime = gfile.raw_mime_type();
+                                        let mut attach_sig = attachment.clone();
+                                        spawn(async move {
+                                            if let Ok(bytes) = read_as_bytes(&gfile).await {
+                                                let data = BASE64.encode(&bytes);
+                                                attach_sig
+                                                    .set(
+                                                        Some(Attachment {
+                                                            filename: name,
+                                                            content_type: mime,
+                                                            data,
+                                                        }),
+                                                    );
+                                            }
+                                        });
+                                    }
+                                }
+                            },
                         }
                         button {
                             class: "bg-gray-700 text-white rounded px-2",
