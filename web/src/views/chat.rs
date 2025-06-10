@@ -22,6 +22,16 @@ fn markdown_to_html(text: &str) -> String {
     html_output
 }
 
+#[cfg(feature = "web")]
+fn load_from_storage(key: &str) -> Option<String> {
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
+}
+
+#[cfg(not(feature = "web"))]
+fn load_from_storage(_key: &str) -> Option<String> { None }
+
 #[component]
 pub fn Chat() -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
@@ -30,7 +40,9 @@ pub fn Chat() -> Element {
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
-    let mut theme = use_signal(|| String::from("system"));
+    let theme = use_signal(|| String::from("system"));
+    let provider = use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
+    let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
 
     let is_dark = move || {
         match theme().as_str() {
@@ -92,11 +104,21 @@ pub fn Chat() -> Element {
         let mut msgs: Signal<Vec<String>> = messages.clone();
         let mut input_signal = input.clone();
         let conv = current().unwrap_or(0);
+        let model_sel = model();
+        let provider_sel = provider();
+        let key_sel = api_key();
         async move {
             if !text.is_empty() {
-                api::send_message(conv, text).await.ok();
+                let user_msg = text.clone();
+                api::send_message(conv, user_msg.clone()).await.ok();
                 if let Ok(all) = api::get_messages(conv).await {
                     msgs.set(all);
+                }
+                if let Ok(resp) = api::chat_completion(provider_sel, key_sel, user_msg, model_sel).await {
+                    api::send_message(conv, resp).await.ok();
+                    if let Ok(all) = api::get_messages(conv).await {
+                        msgs.set(all);
+                    }
                 }
                 input_signal.set(String::new());
             }
@@ -157,8 +179,17 @@ pub fn Chat() -> Element {
                 div { class: "flex flex-col flex-1 pl-4",
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
-                            for msg in messages().iter() {
-                                div { dangerous_inner_html: "{markdown_to_html(msg)}" }
+                            for (idx , msg) in messages().iter().enumerate() {
+                                div { class: if idx % 2 == 0 { "flex justify-end" } else { "flex justify-center" },
+                                    p {
+                                        class: if idx % 2 == 0 { if is_dark() {
+                                            "bg-gray-700 text-white rounded px-2 py-1 mb-2 max-w-md"
+                                        } else {
+                                            "bg-gray-200 text-black rounded px-2 py-1 mb-2 max-w-md"
+                                        } } else { "mb-2 max-w-md" },
+                                        dangerous_inner_html: "{markdown_to_html(msg)}"
+                                    }
+                                }
                             }
                         }
                     }
@@ -186,7 +217,24 @@ pub fn Chat() -> Element {
                             value: "{model}",
                             onchange: move |e| model.set(e.value()),
                             option { value: "gpt-3.5", "GPT-3.5" }
-                            option { value: "gpt-4", "GPT-4" }
+                            option { value: "gpt-o3", "GPT-0.3" }
+                            option { value: "gpt-4o", "GPT-4o" }
+                            option { value: "gpt-4o-mini", "GPT-4o Mini" }
+                            option { value: "gpt-04-mini", "GPT-04 Mini" }
+                            option { value: "gpt-4.1", "GPT-4.1" }
+                            option { value: "gpt-4.1-mini", "GPT-4.1 Mini" }
+                            option { value: "gpt-4.1-nano", "GPT-4.1 Nano" }
+                            option { value: "gpt-4.5", "GPT-4.5" }
+                            option { value: "gemini-2.5-flash", "Gemini 2.5 Flash" }
+                            option { value: "gemini-2.5-pro", "Gemini 2.5 Pro" }
+                            option { value: "claude-4-sonnet", "Claude 4 Sonnet" }
+                            option { value: "claude-4-sonnet-reasoning", "Claude 4 Sonnet Reasoning" }
+                            option { value: "deepseek-r1", "Deepseek r1" }
+                            option { value: "deepseek-v3", "Deepseek v3" }
+                            option { value: "llama-4-scout", "Llama 4 Scout" }
+                            option { value: "qwen-2.5-32b", "Qwen 2.5 32B" }
+                            option { value: "grok-3", "Grok 3" }
+                            option { value: "grok-3-mini", "Grok 3 Mini" }
                         }
                         Link {
                             to: Route::Settings {},

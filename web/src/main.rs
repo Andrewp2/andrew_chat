@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 mod views;
-use views::{Chat, Settings};
+use views::{Chat, Settings, Login};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -10,6 +10,8 @@ enum Route {
     Chat {},
     #[route("/settings")]
     Settings {},
+    #[route("/login")]
+    Login {},
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
