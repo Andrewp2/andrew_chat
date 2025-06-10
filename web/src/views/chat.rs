@@ -1,5 +1,26 @@
 use dioxus::prelude::*;
 use crate::Route;
+use pulldown_cmark::{html, Options, Parser};
+#[cfg(feature = "web")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "web")]
+#[wasm_bindgen(inline_js = "export function highlight_all() { if (window.hljs) { window.hljs.highlightAll(); } }")]
+extern "C" {
+    fn highlight_all();
+}
+
+fn markdown_to_html(text: &str) -> String {
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_FOOTNOTES);
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+    opts.insert(Options::ENABLE_TASKLISTS);
+    let parser = Parser::new_ext(text, opts);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    html_output
+}
 
 #[cfg(feature = "web")]
 fn load_from_storage(key: &str) -> Option<String> {
@@ -68,6 +89,13 @@ pub fn Chat() -> Element {
                 }
             }
         });
+        ()
+    });
+
+    #[cfg(feature = "web")]
+    use_effect(move || {
+        messages();
+        highlight_all();
         ()
     });
 
@@ -159,7 +187,7 @@ pub fn Chat() -> Element {
                                         } else {
                                             "bg-gray-200 text-black rounded px-2 py-1 mb-2 max-w-md"
                                         } } else { "mb-2 max-w-md" },
-                                        "{msg}"
+                                        dangerous_inner_html: "{markdown_to_html(msg)}"
                                     }
                                 }
                             }
