@@ -53,9 +53,11 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "dioxus",
+ "futures",
  "once_cell",
  "serde",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -5526,6 +5528,7 @@ dependencies = [
  "api",
  "base64",
  "dioxus",
+ "futures-util",
  "gloo-file",
  "pulldown-cmark",
  "wasm-bindgen",

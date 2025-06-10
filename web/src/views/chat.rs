@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use futures_util::StreamExt;
 use crate::Route;
 use api::{Attachment, ChatMessage};
 #[cfg(feature = "web")]
@@ -114,6 +115,20 @@ fn ChatBase(id: Option<usize>) -> Element {
         ()
     });
 
+    // Stream new messages for the current conversation
+    use_effect(move || {
+        let id = current();
+        let mut msgs = messages.clone();
+        spawn(async move {
+            if let Some(cid) = id {
+                if let Ok(stream) = api::stream_messages(cid, msgs().len()).await {
+                    let mut inner = stream.into_inner();
+                    while let Some(Ok(chunk)) = inner.next().await {
+                        msgs.with_mut(|m| m.push(chunk));
+                    }
+                }
+            }
+        });
     let mut last_len = use_signal(|| 0usize);
     use_effect(move || {
         if messages().len() > last_len() {
@@ -161,6 +176,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                 .await
                 .ok();
             if !text.is_empty() {
+                api::send_message(conv, text).await.ok();
                 let user_msg = text.clone();
                 api::send_message(conv, user_msg.clone()).await.ok();
                 if let Ok(all) = api::get_messages(conv).await {
