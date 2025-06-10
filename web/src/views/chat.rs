@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 use crate::Route;
+use crate::speech::{speak, start_stt};
 
 #[component]
 pub fn Chat() -> Element {
@@ -9,7 +10,7 @@ pub fn Chat() -> Element {
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
-    let mut theme = use_signal(|| String::from("system"));
+    let theme = use_signal(|| String::from("system"));
 
     let is_dark = move || {
         match theme().as_str() {
@@ -56,6 +57,17 @@ pub fn Chat() -> Element {
                 }
             }
         });
+        ()
+    });
+
+    let mut last_len = use_signal(|| 0usize);
+    use_effect(move || {
+        if messages().len() > last_len() {
+            if let Some(text) = messages().last() {
+                speak(text);
+            }
+            last_len.set(messages().len());
+        }
         ()
     });
 
@@ -145,6 +157,16 @@ pub fn Chat() -> Element {
                                 }
                             },
                             placeholder: "Type a message...",
+                        }
+                        button {
+                            class: "bg-gray-700 text-white rounded px-2",
+                            onclick: move |_| {
+                                start_stt({
+                                    let mut input = input.clone();
+                                    move |t| input.set(t)
+                                });
+                            },
+                            "🎤"
                         }
                         button {
                             class: "bg-gray-700 text-white rounded px-2",
