@@ -35,6 +35,7 @@ fn App() -> Element {
             // Urls are relative to your Cargo.toml file
             href: asset!("/assets/tailwind.css"),
         }
+        document::Stylesheet { href: "https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css" }
         document::Stylesheet { href: "https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/styles/github-dark.min.css" }
         document::Script { src: "https://cdn.jsdelivr.net/npm/highlight.js@11.8.0/lib/common.min.js" }
 
