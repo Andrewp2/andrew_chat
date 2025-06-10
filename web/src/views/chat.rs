@@ -65,6 +65,7 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
     let mut theme = use_signal(|| String::from("system"));
+    let mut use_web_search = use_signal(|| false);
     let katex_opts = KaTeXOptions::inline_mode();
     let provider = use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
     let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
@@ -165,6 +166,16 @@ fn ChatBase(id: Option<usize>) -> Element {
         let mut input_signal = input.clone();
         let mut attachment_signal = attachment.clone();
         let conv = current().unwrap_or(0);
+        let search_flag = use_web_search.clone();
+        async move {
+            if !text.is_empty() {
+                if search_flag() {
+                    if let Ok(res) = api::web_search(text.clone()).await {
+                        let mut list = msgs();
+                        list.push(format!("Search results:\n{res}"));
+                        msgs.set(list);
+                    }
+                }
         let selected_model = model().clone();
         async move {
             if !text.is_empty() {
@@ -365,6 +376,15 @@ fn ChatBase(id: Option<usize>) -> Element {
                             onchange: move |e| model.set(e.value()),
                             option { value: "gpt-3.5", "GPT-3.5" }
                             option { value: "gpt-4", "GPT-4" }
+                            option { value: "gpt-4-web", "GPT-4 Web" }
+                        }
+                        label { class: "flex items-center gap-1 text-sm",
+                            input {
+                                r#type: "checkbox",
+                                checked: "{use_web_search}",
+                                onchange: move |_| use_web_search.set(!use_web_search()),
+                            }
+                            "Web Search"
                             option { value: "dall-e", "DALL-E" }
                             option { value: "gpt-o3", "GPT-0.3" }
                             option { value: "gpt-4o", "GPT-4o" }
