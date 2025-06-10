@@ -1,16 +1,49 @@
 use dioxus::prelude::*;
 use crate::Route;
 use api::ChatMessage;
+use pulldown_cmark::{html, Options, Parser};
+#[cfg(feature = "web")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "web")]
+#[wasm_bindgen(inline_js = "export function highlight_all() { if (window.hljs) { window.hljs.highlightAll(); } }")]
+extern "C" {
+    fn highlight_all();
+}
+
+fn markdown_to_html(text: &str) -> String {
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_FOOTNOTES);
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+    opts.insert(Options::ENABLE_TASKLISTS);
+    let parser = Parser::new_ext(text, opts);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    html_output
+}
+
+#[cfg(feature = "web")]
+fn load_from_storage(key: &str) -> Option<String> {
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
+        .and_then(|s| s.get_item(key).ok().flatten())
+}
+
+#[cfg(not(feature = "web"))]
+fn load_from_storage(_key: &str) -> Option<String> { None }
 
 #[component]
-pub fn Chat() -> Element {
+fn ChatBase(id: Option<usize>) -> Element {
     let mut conversations = use_signal(|| Vec::<usize>::new());
     let mut current = use_signal(|| None::<usize>);
     let mut messages = use_signal(|| Vec::<ChatMessage>::new());
     let mut input = use_signal(|| String::new());
     let mut search = use_signal(|| String::new());
     let mut model = use_signal(|| String::from("gpt-3.5"));
-    let mut theme = use_signal(|| String::from("system"));
+    let theme = use_signal(|| String::from("system"));
+    let provider = use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
+    let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
 
     let is_dark = move || {
         match theme().as_str() {
@@ -34,6 +67,7 @@ pub fn Chat() -> Element {
 
     // Load available conversations on mount
     use_effect(move || {
+        let init = id;
         spawn(async move {
             let mut list = api::list_conversations().await.unwrap_or_default();
             if list.is_empty() {
@@ -41,7 +75,18 @@ pub fn Chat() -> Element {
                     list.push(id);
                 }
             }
-            current.set(list.first().cloned());
+            if let Some(cid) = init {
+                while list.len() <= cid {
+                    if let Ok(new_id) = api::create_conversation().await {
+                        list.push(new_id);
+                    } else {
+                        break;
+                    }
+                }
+                current.set(Some(cid));
+            } else {
+                current.set(list.first().cloned());
+            }
             conversations.set(list);
         });
         ()
@@ -57,6 +102,13 @@ pub fn Chat() -> Element {
                 }
             }
         });
+        ()
+    });
+
+    #[cfg(feature = "web")]
+    use_effect(move || {
+        messages();
+        highlight_all();
         ()
     });
 
@@ -78,8 +130,21 @@ pub fn Chat() -> Element {
                     }
                 }
 
+        let model_sel = model();
+        let provider_sel = provider();
+        let key_sel = api_key();
+        async move {
+            if !text.is_empty() {
+                let user_msg = text.clone();
+                api::send_message(conv, user_msg.clone()).await.ok();
                 if let Ok(all) = api::get_messages(conv).await {
                     msgs.set(all);
+                }
+                if let Ok(resp) = api::chat_completion(provider_sel, key_sel, user_msg, model_sel).await {
+                    api::send_message(conv, resp).await.ok();
+                    if let Ok(all) = api::get_messages(conv).await {
+                        msgs.set(all);
+                    }
                 }
                 input_signal.set(String::new());
             }
@@ -140,14 +205,24 @@ pub fn Chat() -> Element {
                 div { class: "flex flex-col flex-1 pl-4",
                     div { class: if messages().is_empty() { "flex-1 border border-gray-700 p-2 overflow-y-auto flex items-center justify-center" } else { "flex-1 border border-gray-700 p-2 overflow-y-auto" },
                         if !messages().is_empty() {
-                            for msg in messages().iter() {
-                                match msg {
+
+                            for (idx , msg) in messages().iter().enumerate() {
+                                div { class: if idx % 2 == 0 { "flex justify-end" } else { "flex justify-center" },
+                                    p {
+                                        class: if idx % 2 == 0 { if is_dark() {
+                                            "bg-gray-700 text-white rounded px-2 py-1 mb-2 max-w-md"
+                                        } else {
+                                            "bg-gray-200 text-black rounded px-2 py-1 mb-2 max-w-md"
+                                        } } else { "mb-2 max-w-md" },
+                                        match msg {
                                     ChatMessage::Text(t) => rsx! {
-                                        p { "{t}" }
+                                        p { dangerous_inner_html: "{markdown_to_html(msg)}" }
                                     },
                                     ChatMessage::Image(data) => rsx! {
                                         img { src: "{data}" }
                                     },
+                                        
+                                    }
                                 }
                             }
                         }
@@ -178,6 +253,31 @@ pub fn Chat() -> Element {
                             option { value: "gpt-3.5", "GPT-3.5" }
                             option { value: "gpt-4", "GPT-4" }
                             option { value: "dall-e", "DALL-E" }
+                            option { value: "gpt-o3", "GPT-0.3" }
+                            option { value: "gpt-4o", "GPT-4o" }
+                            option { value: "gpt-4o-mini", "GPT-4o Mini" }
+                            option { value: "gpt-04-mini", "GPT-04 Mini" }
+                            option { value: "gpt-4.1", "GPT-4.1" }
+                            option { value: "gpt-4.1-mini", "GPT-4.1 Mini" }
+                            option { value: "gpt-4.1-nano", "GPT-4.1 Nano" }
+                            option { value: "gpt-4.5", "GPT-4.5" }
+                            option { value: "gemini-2.5-flash", "Gemini 2.5 Flash" }
+                            option { value: "gemini-2.5-pro", "Gemini 2.5 Pro" }
+                            option { value: "claude-4-sonnet", "Claude 4 Sonnet" }
+                            option { value: "claude-4-sonnet-reasoning", "Claude 4 Sonnet Reasoning" }
+                            option { value: "deepseek-r1", "Deepseek r1" }
+                            option { value: "deepseek-v3", "Deepseek v3" }
+                            option { value: "llama-4-scout", "Llama 4 Scout" }
+                            option { value: "qwen-2.5-32b", "Qwen 2.5 32B" }
+                            option { value: "grok-3", "Grok 3" }
+                            option { value: "grok-3-mini", "Grok 3 Mini" }
+                        }
+                        Link {
+                            to: Route::ChatShare {
+                                id: current().unwrap_or(0),
+                            },
+                            class: "underline text-sm",
+                            "Share"
                         }
                         Link {
                             to: Route::Settings {},
@@ -189,4 +289,18 @@ pub fn Chat() -> Element {
             }
         }
     }
+}
+
+#[component]
+pub fn Chat() -> Element {
+    rsx!(
+        ChatBase { id: None }
+    )
+}
+
+#[component]
+pub fn ChatShare(id: usize) -> Element {
+    rsx!(
+        ChatBase { id: Some(id) }
+    )
 }
