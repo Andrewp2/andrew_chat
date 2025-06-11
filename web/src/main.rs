@@ -4,7 +4,7 @@ use web_sys::window;
 mod speech;
 mod views;
 use crate::views::Theme;
-use views::{Chat, ChatShare, Login, Settings};
+use views::{Chat, ChatShare, Login, NotFound, Settings};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]

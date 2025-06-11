@@ -1,6 +1,6 @@
-use crate::routes::Route;
 use crate::speech::{speak, start_stt};
 use crate::views::Theme;
+use crate::Route;
 use api::model_config::ModelConfig;
 use api::{Attachment, ChatMessage, MessageSender};
 use dioxus::prelude::*;
@@ -132,7 +132,7 @@ fn render_message_input(
                 oninput: move |e| input.set(e.value()),
                 onkeydown: move |e| {
                     if e.key() == Key::Enter {
-                        on_send(());
+                        on_send.call(());
                     }
                 },
                 placeholder: "Type a message...",
@@ -172,7 +172,7 @@ fn render_message_input(
             }
             button {
                 class: "px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600",
-                onclick: move |_| on_send(()),
+                onclick: move |_| on_send.call(()),
                 "Send"
             }
         }
@@ -231,8 +231,8 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut attachment = use_signal(|| None::<Attachment>);
     let mut input = use_signal(String::new);
     let mut search = use_signal(String::new);
-    let model = use_signal(|| Some(ModelConfig::default()));
-    let all_models = use_signal(|| ModelConfig::load_models().unwrap_or_default());
+    let mut model = use_signal(|| Some(ModelConfig::default()));
+    let mut all_models = use_signal(|| ModelConfig::load_models().unwrap_or_default());
     let mut use_web_search = use_signal(|| false);
     let mut use_image_gen = use_signal(|| false);
     let katex_opts = KaTeXOptions::inline_mode();
@@ -315,7 +315,7 @@ fn ChatBase(id: Option<usize>) -> Element {
     // Stream new messages
     use_effect(move || {
         let current_id = current();
-        let messages = messages.clone();
+        let mut messages = messages.clone();
 
         spawn_local(async move {
             if let Some(cid) = current_id {
@@ -364,7 +364,7 @@ fn ChatBase(id: Option<usize>) -> Element {
         highlight_all();
     });
 
-    let mut on_send = Callback::from(move |_| {
+    let on_send: EventHandler<()> = Callback::new(move |()| {
         let text = input().trim().to_string();
         if text.is_empty() {
             return;
