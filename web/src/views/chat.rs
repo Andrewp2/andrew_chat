@@ -1,5 +1,4 @@
-use crate::speech::{speak, start_stt};
-use crate::views::Theme;
+use crate::speech::speak;
 use crate::Route;
 use api::model_config::ModelConfig;
 use api::{Attachment, ChatMessage, MessageSender};
@@ -9,13 +8,8 @@ use katex_wasmbind::KaTeXOptions;
 use pulldown_cmark::{html, Options, Parser};
 
 #[cfg(feature = "web")]
-use {
-    base64::{engine::general_purpose::STANDARD as BASE64, Engine as _},
-    wasm_bindgen::prelude::*,
-    wasm_bindgen_futures::spawn_local,
-};
+use wasm_bindgen::prelude::*;
 
-// TODO: what the hell is going on here
 #[cfg(feature = "web")]
 #[wasm_bindgen(
     inline_js = "export function highlight_all() { if (window.hljs) { window.hljs.highlightAll(); } }"
@@ -24,7 +18,6 @@ extern "C" {
     fn highlight_all();
 }
 
-// Max attachment size in bytes is 1mb.
 pub const MAX_ATTACHMENT_SIZE: u64 = 1024 * 1024;
 
 fn markdown_to_html(text: &str) -> String {
@@ -97,6 +90,7 @@ fn render_message_list(messages: &[ChatMessage], katex_opts: &KaTeXOptions) -> E
             if !messages.is_empty() {
                 for (idx, msg) in messages.iter().enumerate() {
                     div {
+                        key: "{idx}",
                         class: if idx % 2 == 0 {
                             "flex justify-end"
                         } else {
@@ -180,9 +174,7 @@ fn render_message_input(
 }
 
 fn render_message(msg: &ChatMessage, opts: &KaTeXOptions) -> Element {
-    // Handle text content with optional markdown/math rendering
     let text_content = msg.text.as_ref().map(|text| {
-        // Check for math expressions (either $...$ or $$...$$)
         let is_math = (text.starts_with("$$") && text.ends_with("$$"))
             || (text.starts_with('$') && text.ends_with('$'));
 
@@ -203,7 +195,6 @@ fn render_message(msg: &ChatMessage, opts: &KaTeXOptions) -> Element {
         }
     });
 
-    // Handle attachment if present
     let attachment = msg.attachment.as_ref().map(|att| {
         rsx! {
             div {
@@ -213,7 +204,6 @@ fn render_message(msg: &ChatMessage, opts: &KaTeXOptions) -> Element {
         }
     });
 
-    // Combine text and attachment
     rsx! {
         div { class: "message-content",
             {text_content}
@@ -224,7 +214,6 @@ fn render_message(msg: &ChatMessage, opts: &KaTeXOptions) -> Element {
 
 #[component]
 fn ChatBase(id: Option<usize>) -> Element {
-    // State management
     let mut conversations = use_signal(Vec::<usize>::new);
     let mut current = use_signal(|| id);
     let mut messages = use_signal(Vec::<ChatMessage>::new);
@@ -237,34 +226,41 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut use_image_gen = use_signal(|| false);
     let katex_opts = KaTeXOptions::inline_mode();
     let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
-    let _theme = use_context::<Signal<Theme>>();
     let mut last_len = use_signal(|| 0usize);
 
-    // Load conversations
-    let conv_res = use_resource(move || {
-        let mut current = current.clone();
-        async move {
-            let mut list = api::list_conversations().await.unwrap_or_default();
-            if list.is_empty() {
-                if let Ok(id) = api::create_conversation().await {
-                    list.push(id);
-                    current.set(Some(id));
-                }
-            } else if current().is_none() {
-                current.set(list.first().copied());
-            }
-            list
+    let conv_res =
+        use_resource(|| async move { api::list_conversations().await.unwrap_or_default() });
+
+    let current_id = use_memo(move || {
+        if let Some(id) = id {
+            Some(id)
+        } else if let Some(list) = &*conv_res.read_unchecked() {
+            list.first().copied()
+        } else {
+            None
         }
     });
 
-    // Update conversations state
     use_effect(move || {
         if let Some(list) = &*conv_res.read_unchecked() {
             conversations.set(list.clone());
+
+            if list.is_empty() {
+                spawn(async move {
+                    if let Ok(id) = api::create_conversation().await {
+                        current.set(Some(id));
+                    }
+                });
+            }
         }
     });
 
-    // Load messages for current conversation
+    use_effect(move || {
+        if let Some(id) = current_id() {
+            current.set(Some(id));
+        }
+    });
+
     let current_id = current();
     let msg_res = use_resource(move || {
         let current_id = current_id;
@@ -277,33 +273,27 @@ fn ChatBase(id: Option<usize>) -> Element {
         }
     });
 
-    // Update messages state
     use_effect(move || {
         if let Some(list) = &*msg_res.read_unchecked() {
             messages.set(list.clone());
         }
     });
 
-    // Set the first model as default if none is selected
     use_effect(move || {
         if model.read().is_none() && !all_models.read().is_empty() {
             model.set(Some(all_models.read()[0].clone()));
         }
     });
 
-    // Load models
     use_effect(move || {
-        spawn_local(async move {
-            if let Ok(loaded_models) = ModelConfig::load_models() {
-                all_models.set(loaded_models);
-            } else {
-                log::error!("Failed to load models, using default");
-                all_models.set(vec![ModelConfig::default()]);
-            }
-        });
+        if let Ok(loaded_models) = ModelConfig::load_models() {
+            all_models.set(loaded_models);
+        } else {
+            log::error!("Failed to load models, using default");
+            all_models.set(vec![ModelConfig::default()]);
+        }
     });
 
-    // Update model when models list changes
     use_effect(move || {
         if !all_models().is_empty() && model().is_none() {
             if let Some(first_model) = all_models().first().cloned() {
@@ -312,21 +302,18 @@ fn ChatBase(id: Option<usize>) -> Element {
         }
     });
 
-    // Stream new messages
     use_effect(move || {
         let current_id = current();
         let mut messages = messages.clone();
 
-        spawn_local(async move {
+        spawn(async move {
             if let Some(cid) = current_id {
                 if let Ok(stream) = api::stream_messages(cid, messages().len()).await {
                     let mut inner = stream.into_inner();
                     while let Some(Ok(chunk)) = inner.next().await {
                         messages.with_mut(|msgs| {
-                            // Find the last message from AI
                             if let Some(last_msg) = msgs.last_mut() {
                                 if last_msg.sender == MessageSender::AI {
-                                    // Append to the last AI message
                                     if let Some(text) = &mut last_msg.text {
                                         text.push_str(&chunk);
                                     } else {
@@ -335,7 +322,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                                     return;
                                 }
                             }
-                            // If no AI message exists or last message is from user, create new AI message
+
                             msgs.push(ChatMessage {
                                 text: Some(chunk),
                                 attachment: None,
@@ -348,7 +335,6 @@ fn ChatBase(id: Option<usize>) -> Element {
         });
     });
 
-    // Handle message updates
     use_effect(move || {
         if messages().len() > last_len() {
             if let Some(text) = messages().last() {
@@ -358,7 +344,6 @@ fn ChatBase(id: Option<usize>) -> Element {
         }
     });
 
-    // Web-specific effects
     #[cfg(feature = "web")]
     use_effect(move || {
         highlight_all();
@@ -371,49 +356,41 @@ fn ChatBase(id: Option<usize>) -> Element {
         }
 
         let current_conv = current();
-        let current_model = model();
         let current_attachment = attachment.with(|a| a.clone());
 
-        // Clear input and reset states
         input.set(String::new());
         attachment.set(None);
         use_web_search.set(false);
-        use_image_gen.set(false); // Reset image gen flag after sending
+        use_image_gen.set(false);
 
-        // Create and add user message
         let user_message = ChatMessage {
             text: Some(text.clone()),
             attachment: None,
             sender: MessageSender::User,
         };
 
-        // Add user message to local state immediately
         messages.with_mut(|msgs| {
             msgs.push(user_message);
         });
 
-        spawn_local(async move {
+        spawn(async move {
             let Some(conv_id) = current_conv else { return };
 
-            // Create and add user message to backend
             let user_message = ChatMessage {
                 text: Some(text.clone()),
                 attachment: current_attachment,
                 sender: MessageSender::User,
             };
 
-            // Always add user message to the conversation first
             if let Err(e) = api::send_message(conv_id, user_message.clone()).await {
                 log::error!("Failed to send user message: {}", e);
                 return;
             }
 
-            // Update messages list
             if let Ok(all) = api::get_messages(conv_id).await {
                 messages.set(all);
             }
 
-            // Get the current model, defaulting to the first one if none selected
             let current_model = match model() {
                 Some(m) => m,
                 None => {
@@ -423,7 +400,6 @@ fn ChatBase(id: Option<usize>) -> Element {
             };
 
             if current_model.capabilities.image_generation && *use_image_gen.read() {
-                // Handle image generation
                 if let Ok(image_url) = api::generate_image(text.clone()).await {
                     let image_message = ChatMessage {
                         text: Some(format!("Generated image for: {}", text)),
@@ -439,7 +415,6 @@ fn ChatBase(id: Option<usize>) -> Element {
                     }
                 }
             } else {
-                // Handle regular chat completion
                 let key_sel = api_key();
                 if let Ok(ai_response) =
                     api::chat_completion(key_sel, text.clone(), current_model.clone()).await
@@ -455,12 +430,10 @@ fn ChatBase(id: Option<usize>) -> Element {
                 }
             }
 
-            // Refresh messages after all operations
             if let Ok(all) = api::get_messages(conv_id).await {
                 messages.set(all);
             }
 
-            // Clear input and attachment
             input.set(String::new());
             attachment.set(None);
         });
@@ -507,6 +480,7 @@ fn ChatBase(id: Option<usize>) -> Element {
             ul { class: "flex-1 overflow-y-auto list-none p-0",
                 for cid in filtered.iter().cloned() {
                     li {
+                        key: "{cid}",
                         class: if Some(cid) == current() { "bg-gray-800 p-1" } else { "p-1" },
                         onclick: move |_| current.set(Some(cid)),
                         "Conversation {cid}"

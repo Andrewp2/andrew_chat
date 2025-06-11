@@ -37,6 +37,6 @@ strum = { version = "0.25", features = ["derive"] }
 strum_macros = "0.25"
 
 [features]
-default = ["web"]
+default = []
 web = ["dioxus/web"]
 server = ["dioxus/server"]
