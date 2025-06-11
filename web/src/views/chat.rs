@@ -9,12 +9,10 @@ use katex_wasmbind::KaTeXOptions;
 use pulldown_cmark::{html, Options, Parser};
 
 #[cfg(feature = "web")]
-use wasm_bindgen_futures::spawn_local;
-
-#[cfg(feature = "web")]
 use {
     base64::{engine::general_purpose::STANDARD as BASE64, Engine as _},
     wasm_bindgen::prelude::*,
+    wasm_bindgen_futures::spawn_local,
 };
 
 // TODO: what the hell is going on here
@@ -53,11 +51,14 @@ fn load_from_storage(_key: &str) -> Option<String> {
     None
 }
 
-fn render_model_selector(model: &UseState<Option<ModelConfig>>, models: &[ModelConfig]) -> Element {
-    let current_model_name = model.as_ref().map(|m| &m.name);
-    let selected_index = models
+fn render_model_selector(
+    mut model: Signal<Option<ModelConfig>>,
+    all_models: Vec<ModelConfig>,
+) -> Element {
+    let current_model_name = model.as_ref().map(|m| m.name.clone());
+    let selected_index = all_models
         .iter()
-        .position(|m| Some(&m.name) == current_model_name)
+        .position(|m| Some(m.name.clone()) == current_model_name)
         .unwrap_or(0);
 
     rsx! {
@@ -65,22 +66,22 @@ fn render_model_selector(model: &UseState<Option<ModelConfig>>, models: &[ModelC
             class: "border border-gray-700 rounded p-1",
             value: "{selected_index}",
             onchange: move |e| {
-                if let Ok(index) = e.value().parse::<usize>() {
-                    if let Some(selected_model) = models.get(index).cloned() {
-                        model.set(selected_model);
-                    }
-                }
-            },
-            for (index, model) in models.iter().enumerate() {
-                    if let Some(name) = &model.name {
+              if let Ok(index) = e.value().parse::<usize>() {
+                  if let Some(selected_model) = all_models.get(index) {
+                      let model_clone = selected_model.clone();
+                      model.set(Some(model_clone));
+                  }
+              }
+          },
+            for (index, model) in all_models.iter().enumerate() {
                         option {
                             key: "{index}",
                             value: "{index}",
-                            "{name}"
+                            "{model.name}"
                         }
 
                 }
-            }
+
         }
     }
 }
@@ -117,9 +118,9 @@ fn render_message_list(messages: &[ChatMessage], katex_opts: &KaTeXOptions) -> E
 }
 
 fn render_message_input(
-    input: &UseState<String>,
-    on_send: EventHandler<()>,
-    attachment: &UseState<Option<String>>,
+    mut input: Signal<String>,
+    on_send: Callback<()>,
+    attachment: Signal<Option<Attachment>>,
     is_empty: bool,
 ) -> Element {
     rsx! {
@@ -140,15 +141,31 @@ fn render_message_input(
                 r#type: "file",
                 accept: "image/*,application/pdf",
                 onchange: move |e| {
+                  async move {
                     if let Some(file_engine) = e.files() {
                         let files = file_engine.files();
                         if let Some(file_name) = files.get(0) {
                             let mut attach_sig = attachment.clone();
-                            spawn_local(async move {
-                                // ... (rest of the file handling code)
-                            });
+                              let file = file_engine.read_file_to_string(&(file_name.clone())).await;
+                              if let Some(file) = file {
+                              let content_type = match file_name.split('.').last() {
+                                Some("pdf") => "application/pdf".to_string(),
+                                Some("png") => "image/png".to_string(),
+                                Some("jpg") => "image/jpeg".to_string(),
+                                Some("jpeg") => "image/jpeg".to_string(),
+                                Some("gif") => "image/gif".to_string(),
+                                Some("webp") => "image/webp".to_string(),
+                                _ => "application/octet-stream".to_string(),
+                              };
+                              attach_sig.set(Some(Attachment {
+                                filename: file_name.clone(),
+                                content_type,
+                                data: file,
+                              }));
+                              }
                         }
                     }
+                  }
                 },
                 class: "hidden",
                 id: "file-upload",
@@ -215,9 +232,9 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut input = use_signal(String::new);
     let mut search = use_signal(String::new);
     let model = use_signal(|| Some(ModelConfig::default()));
-    let models = use_signal(|| ModelConfig::load_models().unwrap_or_default());
+    let all_models = use_signal(|| ModelConfig::load_models().unwrap_or_default());
     let mut use_web_search = use_signal(|| false);
-    let mut use_image_gen = use_signal(|| false); // New signal for image generation
+    let mut use_image_gen = use_signal(|| false);
     let katex_opts = KaTeXOptions::inline_mode();
     let api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
     let _theme = use_context::<Signal<Theme>>();
@@ -269,8 +286,8 @@ fn ChatBase(id: Option<usize>) -> Element {
 
     // Set the first model as default if none is selected
     use_effect(move || {
-        if model.read().is_none() && !models.read().is_empty() {
-            model.set(Some(models.read()[0].clone()));
+        if model.read().is_none() && !all_models.read().is_empty() {
+            model.set(Some(all_models.read()[0].clone()));
         }
     });
 
@@ -278,18 +295,18 @@ fn ChatBase(id: Option<usize>) -> Element {
     use_effect(move || {
         spawn_local(async move {
             if let Ok(loaded_models) = ModelConfig::load_models() {
-                models.set(loaded_models);
+                all_models.set(loaded_models);
             } else {
                 log::error!("Failed to load models, using default");
-                models.set(vec![ModelConfig::default()]);
+                all_models.set(vec![ModelConfig::default()]);
             }
         });
     });
 
     // Update model when models list changes
     use_effect(move || {
-        if !models().is_empty() && model().is_none() {
-            if let Some(first_model) = models().first().cloned() {
+        if !all_models().is_empty() && model().is_none() {
+            if let Some(first_model) = all_models().first().cloned() {
                 model.set(Some(first_model));
             }
         }
@@ -347,7 +364,7 @@ fn ChatBase(id: Option<usize>) -> Element {
         highlight_all();
     });
 
-    let mut on_send = move |_| {
+    let mut on_send = Callback::from(move |_| {
         let text = input().trim().to_string();
         if text.is_empty() {
             return;
@@ -447,7 +464,7 @@ fn ChatBase(id: Option<usize>) -> Element {
             input.set(String::new());
             attachment.set(None);
         });
-    };
+    });
 
     let on_new_conv = move |_| {
         let mut convs = conversations.clone();
@@ -508,9 +525,9 @@ fn ChatBase(id: Option<usize>) -> Element {
                 {sidebar}
                 div {
                     div {
-                      {render_model_selector(&model, models().as_ref())}
+                      {render_model_selector(model.clone(), all_models())}
                         {render_message_list(&messages(), &katex_opts)}
-                        {render_message_input(&input, on_send, &attachment, messages().is_empty())}
+                        {render_message_input(input.clone(), on_send, attachment.clone(), messages().is_empty())}
                     }
                     div { class: "flex items-center gap-4 mt-2",
                         label {
