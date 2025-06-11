@@ -9,7 +9,7 @@ fn window() -> web_sys::Window {
 #[cfg(target_arch = "wasm32")]
 pub fn speak(text: &str) {
     let win = window();
-    if let Some(synth) = win.speech_synthesis() {
+    if let Ok(synth) = win.speech_synthesis() {
         if let Ok(utter) = web_sys::SpeechSynthesisUtterance::new_with_text(text) {
             synth.speak(&utter);
         }
@@ -28,11 +28,13 @@ pub fn start_stt<F: FnMut(String) + 'static>(mut callback: F) {
         rec.set_interim_results(false);
         let closure = Closure::<dyn FnMut(web_sys::Event)>::new(move |e: web_sys::Event| {
             if let Ok(event) = e.dyn_into::<SpeechRecognitionEvent>() {
-                if let Some(res) = event.results().get(0) {
-                    let res: SpeechRecognitionResult = res.dyn_into().unwrap();
-                    if let Some(alt) = res.get(0) {
-                        let alt: SpeechRecognitionAlternative = alt.dyn_into().unwrap();
-                        callback(alt.transcript());
+                if let Some(list) = event.results() {
+                    if let Some(res) = list.get(0) {
+                        let res: SpeechRecognitionResult = res.dyn_into().unwrap();
+                        if let Some(alt) = res.get(0) {
+                            let alt: SpeechRecognitionAlternative = alt.dyn_into().unwrap();
+                            callback(alt.transcript());
+                        }
                     }
                 }
             }

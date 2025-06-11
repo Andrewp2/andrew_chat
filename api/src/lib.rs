@@ -3,10 +3,12 @@ pub mod model_config;
 
 use base64::Engine;
 use dioxus::prelude::*;
-use futures::{stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
+use std::pin::Pin;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use server_fn::codec::{StreamingText, TextStream};
+use server_fn::error::NoCustomError;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
@@ -118,20 +120,31 @@ pub async fn stream_messages(conv_id: usize, from: usize) -> Result<TextStream, 
             (conv.messages.clone(), conv.tx.clone())
         } else {
             // Return an empty stream if conversation not found
-            return Ok(TextStream::new(Box::pin(stream::empty()) as _));
+            let empty: Pin<Box<dyn Stream<Item = Result<String, ServerFnError>> + Send>> =
+                Box::pin(stream::empty::<Result<String, ServerFnError>>());
+            return Ok(TextStream::new(empty));
         }
     };
 
-    // Create a stream of past messages
-    let past = stream::iter(messages.into_iter().skip(from).map(Ok));
+    // Create a stream of past messages serialized to JSON
+    let past = stream::iter(
+        messages
+            .into_iter()
+            .skip(from)
+            .map(|m| serde_json::to_string(&m).map_err(|e| ServerFnError::ServerError(e.to_string()))),
+    );
 
     // Create a stream of incoming messages
     let rx = sender.subscribe();
-    let incoming = BroadcastStream::new(rx).filter_map(|msg| msg.ok()).map(Ok);
+    let incoming = BroadcastStream::new(rx)
+        .filter_map(|msg| async move { msg.ok() })
+        .map(|m| serde_json::to_string(&m).map_err(|e| ServerFnError::ServerError(e.to_string())));
 
     // Combine the streams and convert to TextStream
     let stream = past.chain(incoming);
-    Ok(TextStream::new(Box::pin(stream) as _))
+    let boxed: Pin<Box<dyn Stream<Item = Result<String, ServerFnError>> + Send>> =
+        Box::pin(stream);
+    Ok(TextStream::new(boxed))
 }
 
 /// Generate an image from a prompt and return it as a data URI.
@@ -195,15 +208,15 @@ pub async fn chat_completion(
                 .json(&body)
                 .send()
                 .await
-                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+                .map_err(|e| ServerFnError::<NoCustomError>::ServerError(e.to_string()))?;
             let json: serde_json::Value = res
                 .json()
                 .await
-                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+                .map_err(|e| ServerFnError::<NoCustomError>::ServerError(e.to_string()))?;
             if let Some(reply) = json["choices"][0]["message"]["content"].as_str() {
                 Ok(reply.to_string())
             } else {
-                Err(ServerFnError::ServerError("invalid response".into()))
+                Err(ServerFnError::<NoCustomError>::ServerError("invalid response".into()))
             }
         }
         Provider::Anthropic => {
@@ -219,15 +232,15 @@ pub async fn chat_completion(
                 .json(&body)
                 .send()
                 .await
-                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+                .map_err(|e| ServerFnError::<NoCustomError>::ServerError(e.to_string()))?;
             let json: serde_json::Value = res
                 .json()
                 .await
-                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+                .map_err(|e| ServerFnError::<NoCustomError>::ServerError(e.to_string()))?;
             if let Some(reply) = json["content"][0]["text"].as_str() {
                 Ok(reply.to_string())
             } else {
-                Err(ServerFnError::ServerError("invalid response".into()))
+                Err(ServerFnError::<NoCustomError>::ServerError("invalid response".into()))
             }
         }
         Provider::OpenRouter => {
@@ -241,18 +254,18 @@ pub async fn chat_completion(
                 .json(&body)
                 .send()
                 .await
-                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+                .map_err(|e| ServerFnError::<NoCustomError>::ServerError(e.to_string()))?;
             let json: serde_json::Value = res
                 .json()
                 .await
-                .map_err(|e| ServerFnError::ServerError(e.to_string()))?;
+                .map_err(|e| ServerFnError::<NoCustomError>::ServerError(e.to_string()))?;
             if let Some(reply) = json["choices"][0]["message"]["content"].as_str() {
                 Ok(reply.to_string())
             } else {
-                Err(ServerFnError::ServerError("invalid response".into()))
+                Err(ServerFnError::<NoCustomError>::ServerError("invalid response".into()))
             }
         }
-        _ => Err(ServerFnError::ServerError("unknown provider".into())),
+        _ => Err(ServerFnError::<NoCustomError>::ServerError("unknown provider".into())),
     }
 }
 
