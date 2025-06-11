@@ -91,13 +91,13 @@ fn render_message_list(messages: &[ChatMessage], katex_opts: &KaTeXOptions) -> E
                 for (idx, msg) in messages.iter().enumerate() {
                     div {
                         key: "{idx}",
-                        class: if idx % 2 == 0 {
+                        class: if msg.sender == MessageSender::User {
                             "flex justify-end"
                         } else {
                             "flex justify-start"
                         },
                         div {
-                            class: if idx % 2 == 0 {
+                            class: if msg.sender == MessageSender::User {
                                 "dark:bg-gray-700 dark:text-white rounded px-2 py-1 mb-2 max-w-md"
                             } else {
                                 "mb-2 max-w-md"
