@@ -1,0 +1,52 @@
+[
+  {
+    "provider": "openai",
+    "company": "openai",
+    "model_name": "gpt-4o",
+    "image_gen": false,
+    "web_search": false,
+    "image_analysis": true,
+    "reasoning": true,
+    "pdf_analysis": false
+  },
+  {
+    "provider": "openai",
+    "company": "openai",
+    "model_name": "gpt-4o",
+    "image_gen": false,
+    "web_search": false,
+    "image_analysis": true,
+    "reasoning": true,
+    "pdf_analysis": false
+  },
+  {
+    "provider": "openai",
+    "company": "openai",
+    "model_name": "gpt-4o-mini",
+    "image_gen": false,
+    "web_search": false,
+    "image_analysis": false,
+    "reasoning": false,
+    "pdf_analysis": false
+  },
+  {
+    "provider": "anthropic",
+    "company": "anthropic",
+    "model_name": "claude-3-opus-20240229",
+    "image_gen": false,
+    "web_search": false,
+    "image_analysis": false,
+    "reasoning": false,
+    "pdf_analysis": false
+  },
+  {
+    "provider": "groq",
+    "company": "meta",
+    "model_name": "llama-4-scout",
+    "image_gen": false,
+    "web_search": false,
+    "image_analysis": false,
+    "reasoning": false,
+    "pdf_analysis": false
+  }
+]

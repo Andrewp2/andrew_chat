@@ -21,18 +21,17 @@ fn load_from_storage(key: &str) -> Option<String> {
 }
 
 #[cfg(not(feature = "web"))]
-fn load_from_storage(_key: &str) -> Option<String> { None }
+fn load_from_storage(_key: &str) -> Option<String> {
+    None
+}
 
 #[component]
 pub fn Settings() -> Element {
-<<<<<<< HEAD
-    let mut theme = use_signal(|| String::from("system"));
     let mut api_key = use_signal(|| load_from_storage("api_key").unwrap_or_default());
-    let mut provider = use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
-=======
+    let mut provider =
+        use_signal(|| load_from_storage("provider").unwrap_or_else(|| "openai".into()));
     let mut theme = use_context::<Signal<Theme>>();
 
->>>>>>> 00c8f4b (WIP)
     rsx! {
         div { class: "p-4 space-y-4 max-w-md mx-auto",
             h1 { class: "text-xl font-bold mb-2", "Settings" }
@@ -56,7 +55,6 @@ pub fn Settings() -> Element {
                     option { value: "dark",   "Dark"   }
                 }
             }
-<<<<<<< HEAD
             div {
                 label { class: "mr-2", "Provider:" }
                 select {
@@ -80,9 +78,6 @@ pub fn Settings() -> Element {
                     },
                 }
             }
-=======
-
->>>>>>> 00c8f4b (WIP)
             Link { to: Route::Chat {}, class: "text-blue-500 underline", "Back" }
         }
     }

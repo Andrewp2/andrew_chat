@@ -1,15 +1,10 @@
 use dioxus::prelude::*;
 use web_sys::window;
 
-mod views;
-<<<<<<< HEAD
 mod speech;
-use views::{Chat, ChatShare, Settings, Login};
-=======
-use views::{Chat, NotFound, Settings};
-
+mod views;
 use crate::views::Theme;
->>>>>>> 00c8f4b (WIP)
+use views::{Chat, ChatShare, Login, Settings};
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -20,13 +15,10 @@ enum Route {
     ChatShare { id: usize },
     #[route("/settings")]
     Settings {},
-<<<<<<< HEAD
     #[route("/login")]
     Login {},
-=======
     #[route("/:..route")]
     NotFound { route: Vec<String> },
->>>>>>> 00c8f4b (WIP)
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");

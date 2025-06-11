@@ -7,6 +7,7 @@ pub enum Theme {
     System,
 }
 
+#[allow(non_snake_case)]
 pub fn DarkModeToggle() -> Element {
     let mut theme = use_context::<Signal<Theme>>();
     let checked = matches!(theme(), Theme::Dark);

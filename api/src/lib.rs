@@ -1,46 +1,32 @@
 //! This crate contains all shared fullstack server functions.
+pub mod model_config;
+
+use base64::Engine;
 use dioxus::prelude::*;
-use serde::{Deserialize, Serialize};
+use futures::{stream, StreamExt};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use server_fn::codec::{StreamingText, TextStream};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
 use tokio_stream::wrappers::BroadcastStream;
-use futures::{stream, StreamExt};
-use server_fn::codec::{StreamingText, TextStream};
 
-/// Represents the messages for each conversation.
-struct Conversation {
-    messages: Vec<String>,
-    tx: broadcast::Sender<String>,
-}
-
-impl Conversation {
-    fn new() -> Self {
-        let (tx, _rx) = broadcast::channel(32);
-        Self { messages: Vec::new(), tx }
-    }
-}
-
-type Conversations = Vec<Conversation>;
-
-/// In memory list of conversations used for demo purposes.
-/// Each conversation stores messages and broadcasts new ones for streaming.
-static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> = Lazy::new(|| {
-    Arc::new(RwLock::new(vec![Conversation::new()]))
-});
-use std::collections::HashMap;
-use tokio::sync::RwLock;
-use base64::Engine;
+pub use model_config::ModelConfig;
 
 /// Represents a message in a conversation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ChatMessage {
-    Text(String),
-    /// Base64 encoded data uri of an image
-    Image(String),
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MessageSender {
+    User,
+    AI,
 }
-use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessage {
+    pub text: Option<String>,
+    pub attachment: Option<Attachment>,
+    pub sender: MessageSender,
+}
 
 /// Attachment data sent with a chat message.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,20 +36,28 @@ pub struct Attachment {
     pub data: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ChatMessage {
-    pub text: Option<String>,
-    pub attachment: Option<Attachment>,
+/// Represents a conversation with its messages and broadcast channel.
+struct Conversation {
+    messages: Vec<ChatMessage>,
+    tx: broadcast::Sender<ChatMessage>,
 }
 
-/// Represents the messages for each conversation.
-type Conversations = Vec<Vec<ChatMessage>>;
+impl Conversation {
+    fn new() -> Self {
+        let (tx, _rx) = broadcast::channel(32);
+        Self {
+            messages: Vec::new(),
+            tx,
+        }
+    }
+}
 
-/// In memory list of chat messages.
-/// In memory list of conversations. Each conversation is a vector of chat messages.
+type Conversations = Vec<Conversation>;
+
+/// In-memory list of conversations used for demo purposes.
+/// Each conversation stores messages and broadcasts new ones for streaming.
 static CHAT_HISTORY: Lazy<Arc<RwLock<Conversations>>> =
-    Lazy::new(|| Arc::new(RwLock::new(vec![Vec::new()])));
-<<<<<<< HEAD
+    Lazy::new(|| Arc::new(RwLock::new(vec![Conversation::new()])));
 
 /// In-memory store of users where the key is the username and the value is the password.
 static USERS: Lazy<Arc<RwLock<HashMap<String, String>>>> =
@@ -74,8 +68,6 @@ static USERS: Lazy<Arc<RwLock<HashMap<String, String>>>> =
 pub async fn echo(input: String) -> Result<String, ServerFnError> {
     Ok(input)
 }
-=======
->>>>>>> 00c8f4b (WIP)
 
 /// Create a new conversation and return its id.
 #[server(CreateConversation)]
@@ -116,24 +108,28 @@ pub async fn get_messages(conv_id: usize) -> Result<Vec<ChatMessage>, ServerFnEr
 
 /// Stream messages for a conversation starting at the given index.
 #[server(StreamMessages, output = StreamingText)]
-pub async fn stream_messages(
-    conv_id: usize,
-    from: usize,
-) -> Result<TextStream, ServerFnError> {
+pub async fn stream_messages(conv_id: usize, from: usize) -> Result<TextStream, ServerFnError> {
+    // Get the conversation and its message sender
     let (messages, sender) = {
         let history = CHAT_HISTORY.read().await;
         if let Some(conv) = history.get(conv_id) {
             (conv.messages.clone(), conv.tx.clone())
         } else {
-            return Ok(TextStream::new(stream::empty()));
+            // Return an empty stream if conversation not found
+            return Ok(TextStream::new(Box::pin(stream::empty()) as _));
         }
     };
 
-    let past = messages.into_iter().skip(from).map(Ok);
+    // Create a stream of past messages
+    let past = stream::iter(messages.into_iter().skip(from).map(Ok));
+
+    // Create a stream of incoming messages
     let rx = sender.subscribe();
-    let incoming = BroadcastStream::new(rx).filter_map(|msg| async move { msg.ok().map(Ok) });
-    let stream = stream::iter(past).chain(incoming);
-    Ok(TextStream::new(stream))
+    let incoming = BroadcastStream::new(rx).filter_map(|msg| msg.ok()).map(Ok);
+
+    // Combine the streams and convert to TextStream
+    let stream = past.chain(incoming);
+    Ok(TextStream::new(Box::pin(stream) as _))
 }
 
 /// Generate an image from a prompt and return it as a data URI.
@@ -164,9 +160,13 @@ pub async fn register(username: String, password: String) -> Result<(), ServerFn
 #[server(Login)]
 pub async fn login(username: String, password: String) -> Result<bool, ServerFnError> {
     let users = USERS.read().await;
-    Ok(users.get(&username).map(|p| p == &password).unwrap_or(false))
+    Ok(users
+        .get(&username)
+        .map(|p| p == &password)
+        .unwrap_or(false))
 }
 
+//TODO: Why is this "OpenAiMessage"? we have multiple ai providers
 #[derive(Serialize, Deserialize)]
 struct OpenAiMessage<'a> {
     role: &'a str,
@@ -179,12 +179,11 @@ struct OpenAiMessage<'a> {
 /// sent directly to the upstream provider for the request.
 #[server(ChatCompletion)]
 pub async fn chat_completion(
-    provider: String,
     api_key: String,
     prompt: String,
-    model: String,
+    model: ModelConfig,
 ) -> Result<String, ServerFnError> {
-    match provider.as_str() {
+    match model.provider.as_str() {
         "openai" => {
             let client = reqwest::Client::new();
             let body = serde_json::json!({
@@ -237,6 +236,7 @@ pub async fn chat_completion(
     }
 }
 
+// TODO: This is incorrect, I said to use the AI chat model search, not a search engine like DuckDuckGo.
 /// Perform a web search using DuckDuckGo and return a summary of the top results.
 #[server(WebSearch)]
 pub async fn web_search(query: String) -> Result<String, ServerFnError> {
@@ -244,13 +244,16 @@ pub async fn web_search(query: String) -> Result<String, ServerFnError> {
         "https://api.duckduckgo.com/?q={}&format=json&no_redirect=1&no_html=1",
         urlencoding::encode(&query)
     );
-    let resp = reqwest::get(url)
-        .await
-        .map_err(|e| server_fn::error::ServerFnError::<server_fn::error::NoCustomError>::ServerError(e.to_string()))?;
-    let json: serde_json::Value = resp
-        .json()
-        .await
-        .map_err(|e| server_fn::error::ServerFnError::<server_fn::error::NoCustomError>::ServerError(e.to_string()))?;
+    let resp = reqwest::get(url).await.map_err(|e| {
+        server_fn::error::ServerFnError::<server_fn::error::NoCustomError>::ServerError(
+            e.to_string(),
+        )
+    })?;
+    let json: serde_json::Value = resp.json().await.map_err(|e| {
+        server_fn::error::ServerFnError::<server_fn::error::NoCustomError>::ServerError(
+            e.to_string(),
+        )
+    })?;
 
     let mut results = Vec::new();
     if let Some(topics) = json.get("RelatedTopics").and_then(|v| v.as_array()) {
