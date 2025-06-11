@@ -1,3 +1,5 @@
+use std::{fs, path::Path};
+
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 
@@ -30,12 +32,10 @@ pub enum Company {
     Google,
     #[strum(serialize = "xai")]
     XAI,
-    #[strum(serialize = "groq")]
-    Groq,
     #[strum(serialize = "deepseek")]
     DeepSeek,
-    #[strum(serialize = "openrouter")]
-    OpenRouter,
+    #[strum(serialize = "meta")]
+    Meta,
 }
 
 /// Represents the capabilities of a model
@@ -70,5 +70,22 @@ impl Default for ModelConfig {
             capabilities: Capabilities::default(),
             description: "OpenAI's most advanced model".to_string(),
         }
+    }
+}
+
+impl ModelConfig {
+    // Load models from a JSON file
+    pub fn load_models() -> Result<Vec<Self>, Box<dyn std::error::Error>> {
+        let json_path = Path::new("models.json");
+        let json_content = fs::read_to_string(json_path)?;
+        let models: Vec<ModelConfig> = serde_json::from_str(&json_content)?;
+        Ok(models)
+    }
+
+    // Get the default model (first one in the list)
+    pub fn default_model() -> Self {
+        Self::load_models()
+            .and_then(|mut models| models.pop().ok_or_else(|| "No models found".into()))
+            .unwrap_or_default()
     }
 }

@@ -12,7 +12,7 @@
   {
     "provider": "openai",
     "company": "openai",
-    "model_name": "gpt-4o",
+    "model_name": "gpt-4.1",
     "image_gen": false,
     "web_search": false,
     "image_analysis": true,
@@ -22,7 +22,7 @@
   {
     "provider": "openai",
     "company": "openai",
-    "model_name": "gpt-4o-mini",
+    "model_name": "gpt-o3",
     "image_gen": false,
     "web_search": false,
     "image_analysis": false,

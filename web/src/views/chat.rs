@@ -53,10 +53,7 @@ fn load_from_storage(_key: &str) -> Option<String> {
     None
 }
 
-fn render_model_selector(
-    model: &UseState<Option<ModelConfig>>,
-    models: &[Option<ModelConfig>],
-) -> Element {
+fn render_model_selector(model: &UseState<Option<ModelConfig>>, models: &[ModelConfig]) -> Element {
     let current_model_name = model.as_ref().map(|m| &m.name);
     let selected_index = models
         .iter()
@@ -75,14 +72,13 @@ fn render_model_selector(
                 }
             },
             for (index, model) in models.iter().enumerate() {
-                if let Some(model) = model {
                     if let Some(name) = &model.name {
                         option {
                             key: "{index}",
                             value: "{index}",
                             "{name}"
                         }
-                    }
+
                 }
             }
         }
@@ -219,26 +215,7 @@ fn ChatBase(id: Option<usize>) -> Element {
     let mut input = use_signal(String::new);
     let mut search = use_signal(String::new);
     let model = use_signal(|| Some(ModelConfig::default()));
-    let models = use_signal(|| {
-        // Create a few default models
-        vec![
-            ModelConfig::default(),
-            ModelConfig {
-                name: "claude-3-opus-20240229".to_string(),
-                provider: api::model_config::Provider::Anthropic,
-                max_tokens: 200000,
-                capabilities: api::model_config::Capabilities {
-                    text: true,
-                    image_generation: false,
-                    image_understanding: true,
-                    web_search: true,
-                    file_upload: true,
-                    function_calling: true,
-                },
-                description: "Anthropic's most powerful model".to_string(),
-            },
-        ]
-    });
+    let models = use_signal(|| ModelConfig::load_models().unwrap_or_default());
     let mut use_web_search = use_signal(|| false);
     let mut use_image_gen = use_signal(|| false); // New signal for image generation
     let katex_opts = KaTeXOptions::inline_mode();
@@ -531,7 +508,7 @@ fn ChatBase(id: Option<usize>) -> Element {
                 {sidebar}
                 div {
                     div {
-                      {render_model_selector(&model, &models().into_iter().map(Some).collect::<Vec<_>>())}
+                      {render_model_selector(&model, models().as_ref())}
                         {render_message_list(&messages(), &katex_opts)}
                         {render_message_input(&input, on_send, &attachment, messages().is_empty())}
                     }
