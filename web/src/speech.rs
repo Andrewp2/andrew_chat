@@ -18,7 +18,10 @@ pub fn speak(text: &str) {
 
 #[cfg(target_arch = "wasm32")]
 pub fn start_stt<F: FnMut(String) + 'static>(mut callback: F) {
-    use web_sys::{SpeechRecognition, SpeechRecognitionEvent, SpeechRecognitionAlternative, SpeechRecognitionResult};
+    use web_sys::{
+        SpeechRecognition, SpeechRecognitionAlternative, SpeechRecognitionEvent,
+        SpeechRecognitionResult,
+    };
 
     if let Ok(rec) = SpeechRecognition::new() {
         rec.set_lang("en-US");
@@ -46,4 +49,3 @@ pub fn speak(_text: &str) {}
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start_stt<F: FnMut(String) + 'static>(_callback: F) {}
-
